@@ -8,6 +8,13 @@
 
 int myfd;
 
+/*
+  (Result Set Header Packet)  the number of columns
+  (Field Packets)             column descriptors
+  (EOF Packet)                marker: end of Field Packets
+  (Row Data Packets)          row contents
+  (EOF Packet)                marker: end of Data Packets
+*/
 enum my_query_st {
 	MY_READ_NUM,
 	MY_READ_HEADER,
@@ -16,8 +23,28 @@ enum my_query_st {
 
 #define MY_MAX_COL_NAME 256
 
+/*
+ n (Length Coded String)    catalog
+ n (Length Coded String)    db
+ n (Length Coded String)    table
+ n (Length Coded String)    org_table
+ n (Length Coded String)    name
+ n (Length Coded String)    org_name
+ 2                          charsetnr
+ 4                          length
+ 1                          type
+ 2                          flags
+ 1                          decimals
+ 2                          (filler), always 0x00
+ n (Length Coded Binary)    default
+*/
 struct my_col_head {
 	char name[MY_MAX_COL_NAME+1];
+	uint16_t charsetnr;
+	uint16_t flags;
+	uint32_t length;
+	uint8_t type;
+	uint8_t decimals;
 };
 
 struct my {
@@ -92,20 +119,34 @@ const char *my_flags[] = {
 	[BINARY_FLAG] = "BINARY_FLAG"
 };
 
-static uint32_t from_my_2(char *m) {
+static uint32_t from_my_16(char *m) {
 	return ( (unsigned char)m[1] << 8 ) |
 	         (unsigned char)m[0];
 }
-static uint32_t from_my_3(char *m) {
+static uint32_t from_my_24(char *m) {
 	return ( (unsigned char)m[2] << 16 ) |
 	       ( (unsigned char)m[1] << 8 ) | 
 	         (unsigned char)m[0];
 }
-static uint32_t from_my_4(char *m) {
+static uint32_t from_my_32(char *m) {
 	return ( (unsigned char)m[3] << 24 ) |
 	       ( (unsigned char)m[2] << 16 ) |
 	       ( (unsigned char)m[1] << 8 ) |
 	         (unsigned char)m[0];
+}
+static uint64_t from_my_64(char *m) {
+	return 0;
+	/*
+	return (uint64_t)(
+	       ( (unsigned char)m[7] << 64 ) |
+	       ( (unsigned char)m[6] << 56 ) |
+	       ( (unsigned char)m[5] << 48 ) |
+	       ( (unsigned char)m[4] << 40 ) |
+	       ( (unsigned char)m[3] << 32 ) |
+	       ( (unsigned char)m[2] << 16 ) |
+	       ( (unsigned char)m[1] << 8 ) |
+	         (unsigned char)m[0] );
+	*/
 }
 static void to_my_2(int value, char *m) {
 	m[1] = value >> 8;
@@ -121,6 +162,24 @@ static void to_my_4(int value, char *m) {
 	m[2] = value >> 16;
 	m[1] = value >> 8;
 	m[0] = value;
+}
+
+/* length coded binary
+  0-250        0           = value of first byte
+  251          0           column value = NULL
+                           only appropriate in a Row Data Packet
+  252          2           = value of following 16-bit word
+  253          3           = value of following 24-bit word
+  254          8           = value of following 64-bit word
+*/
+static int my_lcb(char *m, uint32_t *r,  char *nul) {
+	switch ((unsigned char)m[0]) {
+	case 251: *r = 0;                   *nul=1; return 0;
+	case 252: *r = from_my_16(&m[1]);   *nul=0; return 3;
+	case 253: *r = from_my_32(&m[1]);   *nul=0; return 4;
+	case 254: *r = from_my_64(&m[1]);   *nul=0; return 5;
+	default:  *r = (unsigned char)m[0]; *nul=0; return 1;
+	}
 }
 
 void my_response(int fd, void *arg);
@@ -181,160 +240,180 @@ void my_select_database(int fd, void *arg) {
 	ev_poll_fd_set(fd, EV_POLL_READ, my_select_db_response, arg);
 }
 
+static void strncpyz(char *d, char *s, int l) {
+	memcpy(d, s, l);
+	d[l] = '\0';
+}
+
+void my_read_value(struct my *m) {
+	uint32_t size;
+	char nul;
+	int i = 0;
+	int j;
+
+	for (j=0; j<m->nb_cols; j++) {
+		fprintf(stderr, "val col %d: ", j);
+		i += my_lcb(&m->buf[i], &size,  &nul);
+		if (nul == 1)
+			fprintf(stderr, "(null)");
+		else {
+			write(2, &m->buf[i], size);
+			i += size;
+		}
+		fprintf(stderr, "\n");
+	}
+	fprintf(stderr, "-----------------------------\n");
+}
+
 void my_read_def(struct my *m) {
 	int l;
 	int i = 0;
 	int j;
 	int flag;
-	int size;
+	uint32_t size;
+	char nul;
+	/*
+	VERSION 4.0
+	 Bytes                      Name
+	 -----                      ----
+	 n (Length Coded String)    table
+	 n (Length Coded String)    name
+	 4 (Length Coded Binary)    length
+	 2 (Length Coded Binary)    type
+	 2 (Length Coded Binary)    flags
+	 1                          decimals
+	 n (Length Coded Binary)    default
+	 
+	 -> VERSION 4.1
+	 Bytes                      Name
+	 -----                      ----
+	 n (Length Coded String)    catalog
+	 n (Length Coded String)    db
+	 n (Length Coded String)    table
+	 n (Length Coded String)    org_table
+	 n (Length Coded String)    name
+	 n (Length Coded String)    org_name
+	 1                          (filler)
+	 2                          charsetnr
+	 4                          length
+	 1                          type
+	 2                          flags
+	 1                          decimals
+	 2                          (filler), always 0x00
+	 n (Length Coded Binary)    default
+	*/
 
-	/* 6 noms longueur / valeur */
-	write(2, "[", 1);
-
-	/* type longueur valeur */
-	l = (unsigned char)m->buf[i];
-	i++;
-	if (l == 0xfc) {
-		l = from_my_2(&m->buf[i]);
-		i += 2;
-	}
-	write(2, &m->buf[i], l);
-	i += l;
-	write(2, "] [", 3);
-
-	/* type longueur valeur */
-	l = (unsigned char)m->buf[i];
-	i++;
-	if (l == 0xfc) {
-		l = from_my_2(&m->buf[i]);
-		i += 2;
-	}
-	write(2, &m->buf[i], l);
-	i += l;
-	write(2, "] [", 3);
-
-	/* type longueur valeur */
-	l = (unsigned char)m->buf[i];
-	i++;
-	if (l == 0xfc) {
-		l = from_my_2(&m->buf[i]);
-		i += 2;
-	}
-	write(2, &m->buf[i], l);
-	i += l;
-	write(2, "] [", 3);
-
-	/* type longueur valeur */
-	l = (unsigned char)m->buf[i];
-	i++;
-	if (l == 0xfc) {
-		l = from_my_2(&m->buf[i]);
-		i += 2;
-	}
-	write(2, &m->buf[i], l);
-	i += l;
+	/* n (Length Coded String)    catalog */
+	i += my_lcb(&m->buf[i], &size, &nul);
+	fprintf(stderr, "catalog: [");
+	write(2, &m->buf[i], size);
 	write(2, "]\n", 2);
+	i += size;
 
-	/* type longueur valeur */
-	/* XXX: coloumn name */
-	l = (unsigned char)m->buf[i];
-	i++;
-	if (l == 0xfc) {
-		l = from_my_2(&m->buf[i]);
-		i += 2;
-	}
-	memcpy(m->cols[m->read_id].name, &m->buf[i], l);
-	m->cols[m->read_id].name[l] = '\0';
-	i += l;
-	fprintf(stderr, "column name(%d)=[%s]", l, m->cols[m->read_id].name);
-
-	/* type longueur valeur */
-	write(2, "[", 1);
-	l = (unsigned char)m->buf[i];
-	i++;
-	if (l == 0xfc) {
-		l = from_my_2(&m->buf[i]);
-		i += 2;
-	}
-	write(2, &m->buf[i], l);
-	i += l;
+	/* n (Length Coded String)    db */
+	i += my_lcb(&m->buf[i], &size, &nul);
+	fprintf(stderr, "db: [");
+	write(2, &m->buf[i], size);
 	write(2, "]\n", 2);
+	i += size;
 
-	/* type longueur valeur */
-	l = (unsigned char)m->buf[i];
-	i++;
-	j = i;
-	/* display */
-	l += i;
-	for (; i < l; i++) {
-		/* taille */
-		if (i == j + 2) {
-			size = from_my_4(&m->buf[i]);
-			fprintf(stderr, "\n%02x %02x %02x %02x: size=%d\n",
-			        (unsigned char)m->buf[i],
-			        (unsigned char)m->buf[i+1],
-			        (unsigned char)m->buf[i+2],
-			        (unsigned char)m->buf[i+3],
-			        size);
-			i+=3;
-		}
-		else if (i == j + 6)
-			fprintf(stderr, "%02x: type=%s\n", (unsigned char)m->buf[i],
-			                            my_type[(unsigned char)m->buf[i]]);
-		else if (i == j + 7) {
-			flag = from_my_3(&m->buf[i]);
-			fprintf(stderr, "%02x %02x %02x: flags={",
-			        (unsigned char)m->buf[i],
-			        (unsigned char)m->buf[i+1],
-			        (unsigned char)m->buf[i+2]);
-			i+=2;
+	/* n (Length Coded String)    table */
+	i += my_lcb(&m->buf[i], &size, &nul);
+	fprintf(stderr, "table: [");
+	write(2, &m->buf[i], size);
+	write(2, "]\n", 2);
+	i += size;
 
-			if ((flag & NOT_NULL_FLAG) != 0)
-				fprintf(stderr, "NOT_NULL_FLAG, ");
-			if ((flag & PRI_KEY_FLAG) != 0)
-				fprintf(stderr, "PRI_KEY_FLAG, ");
-			if ((flag & UNIQUE_KEY_FLAG) != 0)
-				fprintf(stderr, "UNIQUE_KEY_FLAG, ");
-			if ((flag & MULTIPLE_KEY_FLAG) != 0)
-				fprintf(stderr, "MULTIPLE_KEY_FLAG, ");
-			if ((flag & BLOB_FLAG) != 0)
-				fprintf(stderr, "BLOB_FLAG, ");
-			if ((flag & UNSIGNED_FLAG) != 0)
-				fprintf(stderr, "UNSIGNED_FLAG, ");
-			if ((flag & ZEROFILL_FLAG) != 0)
-				fprintf(stderr, "ZEROFILL_FLAG, ");
-			if ((flag & BINARY_FLAG) != 0)
-				fprintf(stderr, "BINARY_FLAG, ");
+	/* n (Length Coded String)    org_table */
+	i += my_lcb(&m->buf[i], &size, &nul);
+	fprintf(stderr, "org_table: [");
+	write(2, &m->buf[i], size);
+	write(2, "]\n", 2);
+	i += size;
 
-			if ((flag & ENUM_FLAG) != 0)
-				fprintf(stderr, "ENUM_FLAG, ");
-			if ((flag & AUTO_INCREMENT_FLAG) != 0)
-				fprintf(stderr, "AUTO_INCREMENT_FLAG, ");
-			if ((flag & TIMESTAMP_FLAG) != 0)
-				fprintf(stderr, "TIMESTAMP_FLAG, ");
-			if ((flag & SET_FLAG) != 0)
-				fprintf(stderr, "SET_FLAG, ");
-			if ((flag & NO_DEFAULT_VALUE_FLAG) != 0)
-				fprintf(stderr, "NO_DEFAULT_VALUE_FLAG, ");
-			if ((flag & NUM_FLAG) != 0)
-				fprintf(stderr, "NUM_FLAG, ");
-			if ((flag & PART_KEY_FLAG) != 0)
-				fprintf(stderr, "PART_KEY_FLAG, ");
-			if ((flag & GROUP_FLAG) != 0)
-				fprintf(stderr, "GROUP_FLAG, ");
+	/* n (Length Coded String)    name */
+	i += my_lcb(&m->buf[i], &size, &nul);
+	strncpyz(m->cols[m->read_id].name, &m->buf[i], size);
+	fprintf(stderr, "name: [%s]\n", m->cols[m->read_id].name);
+	i += size;
 
-			if ((flag & UNIQUE_FLAG) != 0)
-				fprintf(stderr, "UNIQUE_FLAG, ");
-			if ((flag & BINCMP_FLAG) != 0)
-				fprintf(stderr, "BINCMP_FLAG, ");
+	/* n (Length Coded String)    org_name */
+	i += my_lcb(&m->buf[i], &size, &nul);
+	fprintf(stderr, "org_name: [");
+	write(2, &m->buf[i], size);
+	write(2, "]\n", 2);
+	i += size;
 
-			fprintf(stderr, "}\n");
-		}
-		else
-			fprintf(stderr, "%02x ", (unsigned char)m->buf[i]);
-	}
-	fprintf(stderr, "\n\n");
-	fflush(stderr);
+	/* (filler) */
+	i += 1;
+
+	/* charset */
+	m->cols[m->read_id].charsetnr = from_my_16(&m->buf[i]);
+	i += 2;
+	fprintf(stderr, "charset: %d\n", m->cols[m->read_id].charsetnr);
+
+	/* length */
+	m->cols[m->read_id].length = from_my_32(&m->buf[i]);
+	i += 4;
+	fprintf(stderr, "length: %d\n", m->cols[m->read_id].length);
+
+	/* type */
+	m->cols[m->read_id].type = m->buf[i];
+	i += 1;
+	fprintf(stderr, "type: %d: %s\n", m->cols[m->read_id].type,
+	        my_type[m->cols[m->read_id].type]);
+
+	/* flags */
+	m->cols[m->read_id].flags = from_my_24(&m->buf[i]);
+	i += 2;
+	fprintf(stderr, "flags: {");
+	if ((flag & NOT_NULL_FLAG) != 0)
+		fprintf(stderr, "NOT_NULL_FLAG, ");
+	if ((flag & PRI_KEY_FLAG) != 0)
+		fprintf(stderr, "PRI_KEY_FLAG, ");
+	if ((flag & UNIQUE_KEY_FLAG) != 0)
+		fprintf(stderr, "UNIQUE_KEY_FLAG, ");
+	if ((flag & MULTIPLE_KEY_FLAG) != 0)
+		fprintf(stderr, "MULTIPLE_KEY_FLAG, ");
+	if ((flag & BLOB_FLAG) != 0)
+		fprintf(stderr, "BLOB_FLAG, ");
+	if ((flag & UNSIGNED_FLAG) != 0)
+		fprintf(stderr, "UNSIGNED_FLAG, ");
+	if ((flag & ZEROFILL_FLAG) != 0)
+		fprintf(stderr, "ZEROFILL_FLAG, ");
+	if ((flag & BINARY_FLAG) != 0)
+		fprintf(stderr, "BINARY_FLAG, ");
+	if ((flag & ENUM_FLAG) != 0)
+		fprintf(stderr, "ENUM_FLAG, ");
+	if ((flag & AUTO_INCREMENT_FLAG) != 0)
+		fprintf(stderr, "AUTO_INCREMENT_FLAG, ");
+	if ((flag & TIMESTAMP_FLAG) != 0)
+		fprintf(stderr, "TIMESTAMP_FLAG, ");
+	if ((flag & SET_FLAG) != 0)
+		fprintf(stderr, "SET_FLAG, ");
+	if ((flag & NO_DEFAULT_VALUE_FLAG) != 0)
+		fprintf(stderr, "NO_DEFAULT_VALUE_FLAG, ");
+	if ((flag & NUM_FLAG) != 0)
+		fprintf(stderr, "NUM_FLAG, ");
+	if ((flag & PART_KEY_FLAG) != 0)
+		fprintf(stderr, "PART_KEY_FLAG, ");
+	if ((flag & GROUP_FLAG) != 0)
+		fprintf(stderr, "GROUP_FLAG, ");
+	fprintf(stderr, "}\n");
+
+	/* decimals */
+	m->cols[m->read_id].decimals = m->buf[i];
+	fprintf(stderr, "decimals: %d\n", m->cols[m->read_id].decimals);
+	i += 1;
+
+	/* filler */
+	i += 2;
+
+	/* default */
+	i += my_lcb(&m->buf[i], &size, &nul);
+	i += size;
+
+	fprintf(stderr, "-----------------------------\n");
 }
 
 void my_response(int fd, void *arg) {
@@ -345,7 +424,7 @@ void my_response(int fd, void *arg) {
 	read(fd, m->buf, 4);
 
 	/* decode */
-	m->packet_length = from_my_3(&m->buf[0]);
+	m->packet_length = from_my_24(&m->buf[0]);
 
 	/* packet number */
 	m->packet_number = m->buf[3];
@@ -360,7 +439,7 @@ void my_response(int fd, void *arg) {
 		if (m->packet_length > 3) {
 
 			/* read error code */
-			m->errorcode = from_my_2(&m->buf[1]);
+			m->errorcode = from_my_16(&m->buf[1]);
 
 			/* write error msg */
 			write (2, &m->buf[3], m->packet_length - 3);
@@ -376,24 +455,29 @@ void my_response(int fd, void *arg) {
 	/* EOF marker: marque la fin d'une serie
 	   (la fin des headers dans une requete) */
 	else if ((unsigned char)m->buf[0] == 254) {
-		m->warnings = from_my_2(&m->buf[1]);
-		m->status = from_my_2(&m->buf[3]);
+		m->warnings = from_my_16(&m->buf[1]);
+		m->status = from_my_16(&m->buf[3]);
 	}
 
 	/* success */
 	else if ((unsigned char)m->buf[0] == 0) {
 
 		/* affected rows (wireshark donne 1 octet, mais en affiche 2 ...) */
-		m->affected_rows = from_my_2(&m->buf[1]);
+		m->affected_rows = from_my_16(&m->buf[1]);
 
 		/* server status */
-		m->status = from_my_2(&m->buf[3]);
+		m->status = from_my_16(&m->buf[3]);
 
 		/* server status */
-		m->warnings = from_my_2(&m->buf[5]);
+		m->warnings = from_my_16(&m->buf[5]);
 	}
 
-	/* read response ... */
+	/* read response ... 
+	 *
+	 * Result Set Packet           1-250 (first byte of Length-Coded Binary)
+	 * Field Packet                1-250 ("")
+	 * Row Data Packet             1-250 ("")
+	 */
 	else {
 
 		switch (m->qst) {
@@ -417,11 +501,23 @@ void my_response(int fd, void *arg) {
 
 		/* lecture de chaque lignes */
 		case MY_READ_LINE:
+			my_read_value(m);
 			break;
 		}
-
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 void my_auth_response(int fd, void *arg) {
 	my_response(fd, arg);
@@ -497,7 +593,7 @@ void my_read_greatings(int fd, void *arg) {
 
 	/* decode */
 	m->packet_number = m->buf[3];
-	m->packet_length = from_my_3(&m->buf[0]);
+	m->packet_length = from_my_24(&m->buf[0]);
 
 	/* read data */
 	read(fd, m->buf, m->packet_length);
@@ -517,20 +613,20 @@ void my_read_greatings(int fd, void *arg) {
 	i++;
 
 	/* thread id */
-	m->threadid = from_my_4(&m->buf[i]);
+	m->threadid = from_my_32(&m->buf[i]);
 
 	/* first part of salt */
 	strncpy(m->salt, &m->buf[i+4], SCRAMBLE_LENGTH_323);
 	i += 4 + SCRAMBLE_LENGTH_323 + 1;
 
 	/* options */
-	m->options = from_my_2(&m->buf[i]);
+	m->options = from_my_16(&m->buf[i]);
 
 	/* charset */
 	m->charset = m->buf[i+2];
 
 	/* server status */
-	m->status = from_my_2(&m->buf[i+3]);
+	m->status = from_my_16(&m->buf[i+3]);
 
 	/* salt part 2 */
 	strncpy(m->salt + SCRAMBLE_LENGTH_323, &m->buf[i+5+13],
@@ -562,7 +658,8 @@ int main(int argc, char *argv[]) {
 	if (argc == 2)
 		m.query = argv[1];
 	else
-		m.query = "SELECT COUNT(*) AS COUNT FROM test;";
+		m.query = "SELECT * FROM test;";
+		//m.query = "SELECT COUNT(*) AS COUNT FROM test;";
 
 	myfd = ev_socket_connect("127.0.0.1:3306");
 	if (myfd < 0)
