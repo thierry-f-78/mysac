@@ -415,7 +415,7 @@ void my_read_def(struct my *m) {
 
 	fprintf(stderr, "-----------------------------\n");
 }
-
+int c = 0;
 void my_response(int fd, void *arg) {
 	struct my *m = arg;
 	int i;
@@ -457,6 +457,12 @@ void my_response(int fd, void *arg) {
 	else if ((unsigned char)m->buf[0] == 254) {
 		m->warnings = from_my_16(&m->buf[1]);
 		m->status = from_my_16(&m->buf[3]);
+		if (m->qst == MY_READ_LINE) {
+			if (c == 1)
+				exit(0);
+			else
+				c++;
+		}
 	}
 
 	/* success */
@@ -654,11 +660,123 @@ int main(int argc, char *argv[]) {
 
 	m.login = "root";
 	m.password = "root";
-	m.database = "tests";
+	m.database = "nagios";
 	if (argc == 2)
 		m.query = argv[1];
 	else
-		m.query = "SELECT * FROM test;";
+		m.query =
+		    //"SELECT COUNT(*) FROM (\n"
+		    "SELECT\n"
+		    "  GROUP_CONCAT(\n"
+		    "    DISTINCT sub.GROUPES\n"
+		    "    ORDER BY sub.GROUPES\n"
+		    "    DESC SEPARATOR \"|\"\n"
+		    "  )                AS GROUPES,\n"
+		    "  sub.MACHINES     AS MACHINES,\n"
+		    "  sub.MACHINE_NAME AS MACHINE_NAME,\n"
+		    "  sub.SERVICES     AS SERVICES,\n"
+		    "  sub.STATUS       AS STATUS,\n"
+		    "  sub.SVCID        AS SVCID,\n"
+		    "  sub.LASTCHECK    AS LASTCHECK,\n"
+		    "  sub.DURATION     AS DURATION,\n"
+		    "  sub.TYPE         AS TYPE,\n"
+		    "  sub.ACK          AS ACK,\n"
+		    "  sub.DOWNTIME     AS DOWNTIME,\n"
+		    "  sub.NOTIF        AS NOTIF\n"
+		    "\n"
+		    "FROM (\n"
+		    "\n"
+		    "  SELECT\n"
+		    "    PFFF.name1                           AS GROUPES,\n"
+		    "    C.alias                              AS MACHINES,\n"
+		    "    C.display_name                       AS MACHINE_NAME,\n"
+		    "    D.display_name                       AS SERVICES,\n"
+		    "    E.current_state                      AS STATUS,\n"
+		    "    E.servicestatus_id                   AS SVCID,\n"
+		    "    E.problem_has_been_acknowledged      AS ACK,\n"
+		    "    TIMEDIFF(NOW(), E.last_check)        AS LASTCHECK,\n"
+		    "    TIMEDIFF(NOW(), E.last_state_change) AS DURATION,\n"
+		    "    \"svc\"                              AS TYPE,\n"
+		    "    E.scheduled_downtime_depth           AS DOWNTIME,\n"
+		    "    E.notifications_enabled              AS NOTIF\n"
+		    "  \n"
+		    "  FROM\n"
+		    "         nagios_hostgroups AS A\n"
+		    "    INNER JOIN nagios_objects AS PFFF            ON A.hostgroup_object_id = PFFF.object_id\n"
+		    "    INNER JOIN nagios_hostgroup_members AS B     ON A.hostgroup_id = B.hostgroup_id\n"
+		    "    INNER JOIN nagios_hosts AS C                 ON B.host_object_id = C.host_object_id\n"
+		    "    INNER JOIN nagios_hoststatus AS K            ON B.host_object_id = K.host_object_id\n"
+		    "    INNER JOIN nagios_services AS D              ON C.host_object_id = D.host_object_id\n"
+		    "    INNER JOIN nagios_servicestatus AS E         ON D.service_object_id = E.service_object_id\n"
+		    "    INNER JOIN nagios_service_contactgroups AS F ON F.service_id = D.service_id\n"
+		    "    INNER JOIN nagios_contactgroups As G         ON F.contactgroup_object_id = G.contactgroup_object_id\n"
+		    "    INNER JOIN nagios_contactgroup_members AS H  ON H.contactgroup_id = G.contactgroup_id\n"
+		    "    INNER JOIN nagios_contacts AS I              ON I.contact_object_id = H.contact_object_id\n"
+		    "    INNER JOIN nagios_objects AS J               ON J.object_id = I.contact_object_id\n"
+		    "  \n"
+		    "  WHERE\n"
+		    "    (\n"
+		    "          PFFF.name1     LIKE \"%%\"\n"
+		    "      OR  C.alias        LIKE \"%%\"\n"
+		    "      OR  C.display_name LIKE \"%%\" \n"
+		    "      OR  D.display_name LIKE \"%%\" \n"
+		    "    )\n"
+		    "    AND J.name1 = \"coss-exosec\"\n"
+		    "    AND E.current_state IN (0,1,2,3)\n"
+		    "    AND E.problem_has_been_acknowledged IN (0,1)\n"
+		    "    AND K.problem_has_been_acknowledged IN (0,1)\n"
+		    "    AND K.current_state != 1\n"
+		    "  \n"
+		    "  UNION\n"
+		    "  \n"
+		    "  SELECT\n"
+		    "    PFFF.name1                           AS GROUPES,\n"
+		    "    C.alias                              AS MACHINES,\n"
+		    "    C.display_name                       AS MACHINE_NAME,\n"
+		    "    \"--host--\"                         AS SERVICES,\n"
+		    "    K.current_state                      AS STATUS,\n"
+		    "    K.hoststatus_id                      AS SVCID,\n"
+		    "    K.problem_has_been_acknowledged      AS ACK,\n"
+		    "    TIMEDIFF(NOW(), K.last_check)        AS LASTCHECK,\n"
+		    "    TIMEDIFF(NOW(), K.last_state_change) AS DURATION,\n"
+		    "    \"host\"                             AS TYPE,\n"
+		    "    K.scheduled_downtime_depth           AS DOWNTIME,\n"
+		    "    K.notifications_enabled              AS NOTIF\n"
+		    "  \n"
+		    "  FROM\n"
+		    "         nagios_hostgroups AS A\n"
+		    "    INNER JOIN nagios_objects AS PFFF           ON A.hostgroup_object_id = PFFF.object_id\n"
+		    "    INNER JOIN nagios_hostgroup_members AS B    ON A.hostgroup_id = B.hostgroup_id\n"
+		    "    INNER JOIN nagios_hosts AS C                ON B.host_object_id = C.host_object_id\n"
+		    "    INNER JOIN nagios_hoststatus AS K           ON B.host_object_id = K.host_object_id\n"
+		    "    INNER JOIN nagios_host_contactgroups AS F   ON F.host_id = C.host_id\n"
+		    "    INNER JOIN nagios_contactgroups As G        ON F.contactgroup_object_id = G.contactgroup_object_id\n"
+		    "    INNER JOIN nagios_contactgroup_members AS H ON H.contactgroup_id = G.contactgroup_id\n"
+		    "    INNER JOIN nagios_contacts AS I             ON I.contact_object_id = H.contact_object_id\n"
+		    "    INNER JOIN nagios_objects AS J              ON J.object_id = I.contact_object_id\n"
+		    "  \n"
+		    "  WHERE\n"
+		    "    (\n"
+		    "          PFFF.name1     LIKE \"%%\"\n"
+		    "      OR  C.alias        LIKE \"%%\"\n"
+		    "      OR  C.display_name LIKE \"%%\" \n"
+		    "      OR  \"--host--\"   LIKE \"%%\" \n"
+		    "    )\n"
+		    "    AND J.name1 = \"coss-exosec\"\n"
+		    "    AND K.current_state IN (0,1,2)\n"
+		    "    AND K.problem_has_been_acknowledged IN (0,1)\n"
+		    "\n"
+		    ") AS sub\n"
+		    "\n"
+		    "GROUP BY\n"
+		    "  SVCID\n"
+		    "\n"
+		    "ORDER BY GROUPES, MACHINES, SERVICES\n"
+			 "LIMIT 0,30\n"
+		    //") AS sub2\n"
+			 ;
+
+		//m.query = "SELECT TIMEDIFF(NOW(), test.ze_date) AS DIFF, * FROM test;";
 		//m.query = "SELECT COUNT(*) AS COUNT FROM test;";
 
 	myfd = ev_socket_connect("127.0.0.1:3306");
