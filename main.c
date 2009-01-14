@@ -174,7 +174,7 @@ static void to_my_4(int value, char *m) {
 */
 static int my_lcb(char *m, uint32_t *r,  char *nul) {
 	switch ((unsigned char)m[0]) {
-	case 251: *r = 0;                   *nul=1; return 0;
+	case 251: *r = 0;                   *nul=1; return 1;
 	case 252: *r = from_my_16(&m[1]);   *nul=0; return 3;
 	case 253: *r = from_my_32(&m[1]);   *nul=0; return 4;
 	case 254: *r = from_my_64(&m[1]);   *nul=0; return 5;
