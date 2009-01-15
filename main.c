@@ -64,6 +64,7 @@ struct my {
 	unsigned int affected_rows;
 	unsigned int warnings;
 	unsigned int errorcode;
+	char eof;
 
 	/* user */
 	char *login;
@@ -432,6 +433,9 @@ void my_response(int fd, void *arg) {
 	/* read data */
 	read(fd, m->buf, m->packet_length);
 
+	/* re-init eof */
+	m->eof = 1;
+
 	/* error */
 	if ((unsigned char)m->buf[0] == 255) {
 	
@@ -457,6 +461,7 @@ void my_response(int fd, void *arg) {
 	else if ((unsigned char)m->buf[0] == 254) {
 		m->warnings = from_my_16(&m->buf[1]);
 		m->status = from_my_16(&m->buf[3]);
+		m->eof = 1;
 		if (m->qst == MY_READ_LINE) {
 			if (c == 1)
 				exit(0);
@@ -524,11 +529,48 @@ void my_response(int fd, void *arg) {
 
 
 
+void my_auth2(int fd, void *arg) {
+	struct my *m = arg;
+
+	/* set packet number */
+	m->packet_number++;
+	m->buf[3] = m->packet_number;
+
+	/* send scrambled password in old format. */
+	scramble_323(&m->buf[4], m->salt, m->password);
+	m->buf[4+SCRAMBLE_LENGTH_323] = '\0';
+
+	/* len */
+	to_my_3(SCRAMBLE_LENGTH_323+1, &m->buf[0]);
+
+	/* send packet */
+	write(fd, m->buf, SCRAMBLE_LENGTH_323+1+4);
+
+	ev_poll_fd_clr(fd, EV_POLL_WRITE);
+	ev_poll_fd_set(fd, EV_POLL_READ, my_auth_response, arg);
+}
+
 
 void my_auth_response(int fd, void *arg) {
-	my_response(fd, arg);
-	ev_poll_fd_clr(fd, EV_POLL_READ);
-	ev_poll_fd_set(fd, EV_POLL_WRITE, my_select_database, arg);
+	struct my *m = arg;
+
+	my_response(fd, m);
+
+	/*
+	  By sending this very specific reply server asks us to send scrambled
+	  password in old format.
+	*/
+	if (m->packet_length == 1 && m->eof == 1 && 
+	    m->options & CLIENT_SECURE_CONNECTION) {
+		ev_poll_fd_clr(fd, EV_POLL_READ);
+		ev_poll_fd_set(fd, EV_POLL_WRITE, my_auth2, arg);
+	}
+
+	/* if no error, continue program */
+	else {
+		ev_poll_fd_clr(fd, EV_POLL_READ);
+		ev_poll_fd_set(fd, EV_POLL_WRITE, my_select_database, arg);
+	}
 }
 
 void my_select_db_response(int fd, void *arg) {
@@ -539,15 +581,16 @@ void my_select_db_response(int fd, void *arg) {
 
 void my_query_response(int fd, void *arg) {
 	my_response(fd, arg);
-	//exit(0);
 }
 
 void my_auth(int fd, void *arg) {
 	struct my *m = arg;
 	int i;
+	int len;
 
 	/* set m->buf number */
-	m->buf[3] = 1;
+	m->packet_number++;
+	m->buf[3] = m->packet_number;
 
 	/* set options */
 	to_my_2(CLIENT_LONG_PASSWORD     |
@@ -573,13 +616,32 @@ void my_auth(int fd, void *arg) {
 	strcpy(&m->buf[36], m->login);
 	i = 36 + strlen(m->login) + 1;
 
-	/* the password hash len */
-	m->buf[i] = SCRAMBLE_LENGTH;
-	i++;
+	/* password CLIENT_SECURE_CONNECTION */
+	if (m->options & CLIENT_SECURE_CONNECTION) {
 
-	/* password */
-	scramble(&m->buf[i], m->salt, m->password);
-	i += SCRAMBLE_LENGTH;
+		/* the password hash len */
+		m->buf[i] = SCRAMBLE_LENGTH;
+		i++;
+		scramble(&m->buf[i], m->salt, m->password);
+		i += SCRAMBLE_LENGTH;
+	}
+
+	/* password ! CLIENT_SECURE_CONNECTION */
+	else {
+		scramble_323(&m->buf[i], m->salt, m->password);
+		i += SCRAMBLE_LENGTH_323 + 1;
+	}
+
+	/* Add database if needed */
+#if 0
+	if (m->options & CLIENT_CONNECT_WITH_DB) {
+		/* TODO : debordement de buffer */
+		len = strlen(m->database);
+		memcpy(&m->buf[i], m->database, len);
+		i += len;
+		m->buf[i] = '\0';
+	}
+#endif
 
 	/* len */
 	to_my_3(i-4, &m->buf[0]);
@@ -589,6 +651,13 @@ void my_auth(int fd, void *arg) {
 	ev_poll_fd_clr(fd, EV_POLL_WRITE);
 	ev_poll_fd_set(fd, EV_POLL_READ, my_auth_response, arg);
 }
+
+
+
+
+
+
+
 
 void my_read_greatings(int fd, void *arg) {
 	struct my *m = arg;
@@ -658,8 +727,13 @@ int main(int argc, char *argv[]) {
 	ev_timeout_init(&tmout);
 	ev_poll_init(100, &tmout);
 
-	m.login = "root";
-	m.password = "root";
+	/* init query read */
+	m.qst = MY_READ_NUM;
+
+//	m.login = "root";
+//	m.password = "root";
+	m.login = "hypervisor";
+	m.password = "PuuQuae6";
 	m.database = "nagios";
 	if (argc == 2)
 		m.query = argv[1];
@@ -779,7 +853,8 @@ int main(int argc, char *argv[]) {
 		//m.query = "SELECT TIMEDIFF(NOW(), test.ze_date) AS DIFF, * FROM test;";
 		//m.query = "SELECT COUNT(*) AS COUNT FROM test;";
 
-	myfd = ev_socket_connect("127.0.0.1:3306");
+	//myfd = ev_socket_connect("127.0.0.1:3306");
+	myfd = ev_socket_connect("127.0.0.1:4000");
 	if (myfd < 0)
 		exit(1);
 
