@@ -1,8 +1,10 @@
 CFLAGS = -I../events/ -O0 -g
-LDFLAGS = -L../events -levents -lmysqlclient_r
+LDFLAGS = -g -L../events -levents -lmysqlclient_r
 
-main: main.o
+OBJS = mysac.o mysac_net.o
+
+main: main.o $(OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f main *.o
+	rm -f main main.o $(OBJS)
