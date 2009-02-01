@@ -4,6 +4,58 @@
 #include <mysql/errmsg.h>
 #include <mysql/mysql.h>
 
+/* def imported from: linux-2.6.24/include/linux/stddef.h */
+#define offset_of(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+
+/* def imported from: linux-2.6.24/include/linux/kernel.h */
+/**
+ * container_of - cast a member of a structure out to the containing structure
+ * @ptr: the pointer to the member.
+ * @type:   the type of the container struct this is embedded in.
+ * @member: the name of the member within the struct.
+ *
+ */
+#define container_of(ptr, type, member) ({ \
+	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+	(type *)( (char *)__mptr - offset_of(type,member) );})
+
+/* def imported from: linux-2.6.24/include/linux/list.h */
+/*
+ * Simple doubly linked list implementation.
+ *
+ * Some of the internal functions ("__xxx") are useful when
+ * manipulating whole lists rather than single entries, as
+ * sometimes we already know the next/prev entries and we can
+ * generate better code by using them directly rather than
+ * using the generic single-entry routines.
+ */
+struct list_head {
+	struct list_head *next, *prev;
+};
+
+/**
+ * list_entry - get the struct for this entry
+ * @ptr: the &struct list_head pointer.
+ * @type:   the type of the struct this is embedded in.
+ * @member: the name of the list_struct within the struct.
+ */
+#define list_entry(ptr, type, member) \
+	container_of(ptr, type, member)
+
+/**
+ * list_first_entry - get the first element from a list
+ * @ptr: the list head to take the element from.
+ * @type:   the type of the struct this is embedded in.
+ * @member: the name of the list_struct within the struct.
+ *
+ * Note, that list is expected to be not empty.
+ */
+#define list_first_entry(ptr, type, member) \
+	list_entry((ptr)->next, type, member)
+
+#define list_next_entry(ptr, type, member) \
+	list_first_entry(ptr, type, member);
+
 enum my_query_st {
 	MYSAC_START,
 
@@ -18,10 +70,15 @@ enum my_query_st {
 	MYSAC_RECV_QUERY_COLDESC,
 	MYSAC_RECV_QUERY_EOF1,
 	MYSAC_RECV_QUERY_DATA,
-	MYSAC_RECV_QUERY_EOF2,
 
 	MYSAC_SEND_INIT_DB,
 	MYSAC_RECV_INIT_DB,
+
+	MYSAC_SEND_STMT_QUERY,
+	MYSAC_RECV_STMT_QUERY,
+
+	MYSAC_SEND_STMT_EXECUTE,
+	MYSAC_RECV_STMT_EXECUTE,
 
 	MYSAC_READ_NUM,
 	MYSAC_READ_HEADER,
@@ -32,14 +89,47 @@ enum my_query_st {
 #define MYSAC_COL_MAX_LEN 50
 #define MYSAC_COL_MAX_NUN 100
 
-struct mysac_field {
-	char colname[MYSAC_COL_MAX_LEN];
-	MYSQL_FIELD mf;
-};
+extern const char *mysac_type[];
+
+typedef union {
+	signed char stiny;          /* MYSQL_TYPE_TINY      TINYINT */
+	unsigned char utiny;        /* MYSQL_TYPE_TINY      TINYINT */
+	unsigned char mbool;        /* MYSQL_TYPE_TINY      TINYINT */
+	short ssmall;               /* MYSQL_TYPE_SHORT     SMALLINT */
+	unsigned short small;       /* MYSQL_TYPE_SHORT     SMALLINT */
+	int sint;                   /* MYSQL_TYPE_LONG      INT */
+	unsigned int uint;          /* MYSQL_TYPE_LONG      INT */
+	long long sbigint;          /* MYSQL_TYPE_LONGLONG  BIGINT */
+	unsigned long long ubigint; /* MYSQL_TYPE_LONGLONG  BIGINT */
+	float mfloat;               /* MYSQL_TYPE_FLOAT     FLOAT */
+	double mdouble;             /* MYSQL_TYPE_DOUBLE    DOUBLE */
+	struct timeval tv;          /* MYSQL_TYPE_TIME      TIME */
+	struct tm *tm;              /* MYSQL_TYPE_DATE      DATE
+	                               MYSQL_TYPE_DATETIME  DATETIME
+	                               MYSQL_TYPE_TIMESTAMP TIMESTAMP */
+	char* string;               /* MYSQL_TYPE_STRING    TEXT,CHAR,VARCHAR */
+	char* blob;                 /* MYSQL_TYPE_BLOB      BLOB,BINARY,VARBINARY */
+} MYSAC_ROW;
+
+typedef struct mysac_rows {
+	struct list_head link;
+	unsigned long *lengths;
+	MYSAC_ROW *data;
+} MYSAC_ROWS;
+
+typedef struct mysac_res {
+	int nb_cols;
+	int nb_lines;
+	int nb_time;
+	MYSQL_FIELD *cols;
+	struct list_head data;
+	MYSAC_ROWS *cr;	
+} MYSAC_RES;
 
 typedef struct mysac {
 	char buf[MYSAC_BUFFER_SIZE];
 	int len;
+	char *read;
 	char *send;
 	int readst;
 
@@ -50,7 +140,7 @@ typedef struct mysac {
 	char free_it;
 	int fd;
 
-	/* connect */
+	/*defconnect */
 	unsigned int protocol;
 	char *version;
 	unsigned int threadid;
@@ -61,6 +151,8 @@ typedef struct mysac {
 	unsigned int affected_rows;
 	unsigned int warnings;
 	unsigned int errorcode;
+	char *mysql_code;
+	char *mysql_error;
 	char eof;
 
 	/* user */
@@ -73,9 +165,8 @@ typedef struct mysac {
 
 	/* query */
 	enum my_query_st qst;
-	int nb_cols;
 	int read_id;
-	struct mysac_field cols[MYSAC_COL_MAX_NUN];
+	MYSAC_RES *res;
 } MYSAC;
 
 #define MYSAC_WANT_READ 1
@@ -173,6 +264,12 @@ int mysac_get_fd(MYSAC *mysac) {
 int mysac_set_database(MYSAC *mysac, const char *database);
 int mysac_send_database(MYSAC *mysac);
 
+
+static inline
+int mysac_send_stmt_execute(MYSAC *mysac) {
+	return mysac_send_query(mysac);
+}
+
 /**
  * Initialize query
  *
@@ -213,6 +310,70 @@ int mysac_send_query(MYSAC *mysac);
  *         (my_ulonglong)~0, which is equivalent).
  */
 int mysac_affected_rows(MYSAC *mysac);
+
+/**
+ * Returns the number of columns for the most recent query on the connection.
+ *
+ * @param mysac Should be the address of an existing MYSQL structure.
+ *
+ * @return number of columns
+ */
+static inline
+unsigned int mysac_field_count(MYSAC_RES *res) {
+	return res->nb_cols;
+}
+
+/**
+ * Returns the number of rows in the result set.
+ * 
+ * mysql_num_rows() is intended for use with statements that return a result
+ * set, such as SELECT. For statements such as INSERT, UPDATE, or DELETE, the
+ * number of affected rows can be obtained with mysql_affected_rows().
+ *
+ * @param mysac Should be the address of an existing MYSQL structure.
+ *
+ * @return The number of rows in the result set. 
+ */
+static inline
+unsigned long mysac_num_rows(MYSAC_RES *res) {
+	return res->nb_lines;
+}
+
+/**
+ * Retrieves the next row of a result set. mysql_fetch_row() returns NULL when
+ * there are no more rows to retrieve or if an error occurred.
+ * 
+ * The number of values in the row is given by mysql_num_fields(result).
+ *
+ * The lengths of the field values in the row may be obtained by calling
+ * mysql_fetch_lengths(). Empty fields and fields containing NULL both have
+ * length 0; you can distinguish these by checking the pointer for the field
+ * value. If the pointer is NULL, the field is NULL; otherwise, the field is
+ * empty.
+ *
+ * @param mysac Should be the address of an existing MYSQL structure.
+ * 
+ * @return A MYSAC_ROW structure for the next row. NULL if there are no more
+ * rows to retrieve or if an error occurred. 
+ */
+static inline
+MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
+	if (res->cr == NULL)
+		res->cr = list_first_entry(&res->data, MYSAC_ROWS, link);
+	else
+		res->cr = list_next_entry(&res->cr->link, MYSAC_ROWS, link);
+	if (&res->data == &res->cr->link) {
+		res->cr = NULL;
+		return NULL;
+	}
+	return res->cr->data;
+}
+
+#if 0
+mysql_fetch_fields() /*Returns an array of all field structures*/
+mysql_fetch_field() /*Returns the type of the next table field*/
+mysql_fetch_lengths() /*Returns the lengths of all columns in the current row*/
+#endif
 
 /**
  * Changes the user and causes the database specified by db to become the
@@ -320,12 +481,7 @@ mysql_debug() /*Does a DBUG_PUSH with the given string*/
 mysql_drop_db() /*Drops a database (this function is deprecated; use the SQL statement DROP DATABASE instead)*/
 mysql_dump_debug_info() /*Makes the server write debug information to the log*/
 mysql_escape_string() /*Escapes special characters in a string for use in an SQL statement*/
-mysql_fetch_field() /*Returns the type of the next table field*/
 mysql_fetch_field_direct() /*Returns the type of a table field, given a field number*/
-mysql_fetch_fields() /*Returns an array of all field structures*/
-mysql_fetch_lengths() /*Returns the lengths of all columns in the current row*/
-mysql_fetch_row() /*Fetches the next row from the result set*/
-mysql_field_count() /*Returns the number of result columns for the most recent statement*/
 mysql_field_seek() /*Puts the column cursor on a specified column*/
 mysql_field_tell() /*Returns the position of the field cursor used for the last mysql_fetch_field()*/
 mysql_free_result() /*Frees memory used by a result set*/

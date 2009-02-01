@@ -4,76 +4,13 @@
 #include <string.h>
 #include <stdarg.h>
 #include <mysql/mysql.h>
+#include <mysql/my_global.h>
 
+#include "mysac_decode_paquet.h"
+#include "mysac_decode_row.h"
 #include "mysac.h"
-
-static uint32_t from_my_16(char *m) {
-	return ( (unsigned char)m[1] << 8 ) |
-	         (unsigned char)m[0];
-}
-static uint32_t from_my_24(char *m) {
-	return ( (unsigned char)m[2] << 16 ) |
-	       ( (unsigned char)m[1] << 8 ) |
-	         (unsigned char)m[0];
-}
-static uint32_t from_my_32(char *m) {
-	return ( (unsigned char)m[3] << 24 ) |
-	       ( (unsigned char)m[2] << 16 ) |
-	       ( (unsigned char)m[1] << 8 ) |
-	         (unsigned char)m[0];
-}
-static uint64_t from_my_64(char *m) {
-	return 0;
-	/*
-	return (uint64_t)(
-	       ( (unsigned char)m[7] << 64 ) |
-	       ( (unsigned char)m[6] << 56 ) |
-	       ( (unsigned char)m[5] << 48 ) |
-	       ( (unsigned char)m[4] << 40 ) |
-	       ( (unsigned char)m[3] << 32 ) |
-	       ( (unsigned char)m[2] << 16 ) |
-	       ( (unsigned char)m[1] << 8 ) |
-	         (unsigned char)m[0] );
-	*/
-}
-static void to_my_2(int value, char *m) {
-	m[1] = value >> 8;
-	m[0] = value;
-}
-static void to_my_3(int value, char *m) {
-	m[2] = value >> 16;
-	m[1] = value >> 8;
-	m[0] = value;
-}
-static void to_my_4(int value, char *m) {
-	m[3] = value >> 24;
-	m[2] = value >> 16;
-	m[1] = value >> 8;
-	m[0] = value;
-}
-
-/* length coded binary
-  0-250        0           = value of first byte
-  251          0           column value = NULL
-	                        only appropriate in a Row Data Packet
-  252          2           = value of following 16-bit word
-  253          3           = value of following 24-bit word
-  254          8           = value of following 64-bit word
-*/
-static int my_lcb(char *m, uint32_t *r,  char *nul) {
-	switch ((unsigned char)m[0]) {
-	case 251: *r = 0;                   *nul=1; return 1;
-	case 252: *r = from_my_16(&m[1]);   *nul=0; return 3;
-	case 253: *r = from_my_32(&m[1]);   *nul=0; return 4;
-	case 254: *r = from_my_64(&m[1]);   *nul=0; return 5;
-	default:  *r = (unsigned char)m[0]; *nul=0; return 1;
-	}
-}
-
-static inline void strncpyz(char *d, char *s, int l) {
-	memcpy(d, s, l);
-	d[l] = '\0';
-}
+#include "list.h"
+#include "mysac_utils.h"
 
 enum my_response_t {
 	MYSAC_RET_EOF = 1000,
@@ -81,6 +18,37 @@ enum my_response_t {
 	MYSAC_RET_ERROR,
 	MYSAC_RET_DATA
 };
+
+const char *mysac_type[] = {
+	[MYSQL_TYPE_DECIMAL]     = "MYSQL_TYPE_DECIMAL",
+	[MYSQL_TYPE_TINY]        = "MYSQL_TYPE_TINY",
+	[MYSQL_TYPE_SHORT]       = "MYSQL_TYPE_SHORT",
+	[MYSQL_TYPE_LONG]        = "MYSQL_TYPE_LONG",
+	[MYSQL_TYPE_FLOAT]       = "MYSQL_TYPE_FLOAT",
+	[MYSQL_TYPE_DOUBLE]      = "MYSQL_TYPE_DOUBLE",
+	[MYSQL_TYPE_NULL]        = "MYSQL_TYPE_NULL",
+	[MYSQL_TYPE_TIMESTAMP]   = "MYSQL_TYPE_TIMESTAMP",
+	[MYSQL_TYPE_LONGLONG]    = "MYSQL_TYPE_LONGLONG",
+	[MYSQL_TYPE_INT24]       = "MYSQL_TYPE_INT24",
+	[MYSQL_TYPE_DATE]        = "MYSQL_TYPE_DATE",
+	[MYSQL_TYPE_TIME]        = "MYSQL_TYPE_TIME",
+	[MYSQL_TYPE_DATETIME]    = "MYSQL_TYPE_DATETIME",
+	[MYSQL_TYPE_YEAR]        = "MYSQL_TYPE_YEAR",
+	[MYSQL_TYPE_NEWDATE]     = "MYSQL_TYPE_NEWDATE",
+	[MYSQL_TYPE_VARCHAR]     = "MYSQL_TYPE_VARCHAR",
+	[MYSQL_TYPE_BIT]         = "MYSQL_TYPE_BIT",
+	[MYSQL_TYPE_NEWDECIMAL]  = "MYSQL_TYPE_NEWDECIMAL",
+	[MYSQL_TYPE_ENUM]        = "MYSQL_TYPE_ENUM",
+	[MYSQL_TYPE_SET]         = "MYSQL_TYPE_SET",
+	[MYSQL_TYPE_TINY_BLOB]   = "MYSQL_TYPE_TINY_BLOB",
+	[MYSQL_TYPE_MEDIUM_BLOB] = "MYSQL_TYPE_MEDIUM_BLOB",
+	[MYSQL_TYPE_LONG_BLOB]   = "MYSQL_TYPE_LONG_BLOB",
+	[MYSQL_TYPE_BLOB]        = "MYSQL_TYPE_BLOB",
+	[MYSQL_TYPE_VAR_STRING]  = "MYSQL_TYPE_VAR_STRING",
+	[MYSQL_TYPE_STRING]      = "MYSQL_TYPE_STRING",
+	[MYSQL_TYPE_GEOMETRY]    = "MYSQL_TYPE_GEOMETRY"
+};
+
 
 static int my_response(MYSAC *m) {
 	int i;
@@ -95,7 +63,7 @@ static int my_response(MYSAC *m) {
 
 	/* read length */
 	case 1:
-		err = mysac_read(m->fd, m->buf + m->len,
+		err = mysac_read(m->fd, m->read + m->len,
 		                 4 - m->len, &errcode);
 		if (err == -1) {
 			m->errorcode = errcode;
@@ -109,10 +77,10 @@ static int my_response(MYSAC *m) {
 		}
 
 		/* decode */
-		m->packet_length = from_my_24(&m->buf[0]);
+		m->packet_length = uint3korr(&m->read[0]);
 
 		/* packet number */
-		m->packet_number = m->buf[3];
+		m->packet_number = m->read[3];
 
 		/* update read state */
 		m->readst = 2;
@@ -120,7 +88,7 @@ static int my_response(MYSAC *m) {
 
 	/* read data */
 	case 2:
-		err = mysac_read(m->fd, m->buf + m->len,
+		err = mysac_read(m->fd, m->read + m->len,
 		                 m->packet_length - m->len, &errcode);
 		if (err == -1)
 			return errcode;
@@ -139,13 +107,20 @@ static int my_response(MYSAC *m) {
 	case 3:
 
 		/* error */
-		if ((unsigned char)m->buf[0] == 255) {
+		if ((unsigned char)m->read[0] == 255) {
 		
 			/* defined mysql error */
 			if (m->packet_length > 3) {
 	
 				/* read error code */
-				m->errorcode = from_my_16(&m->buf[1]);
+				m->errorcode = uint2korr(&m->read[1]);
+
+				/* read mysal code and message */
+				for (i=3; i<3+5; i++)
+					m->read[i] = m->read[i+1];
+				m->read[8] = ' ';
+				m->mysql_error = &m->read[3];
+				m->read[m->packet_length] = '\0';
 			}
 	
 			/* unknown error */
@@ -157,24 +132,24 @@ static int my_response(MYSAC *m) {
 	
 		/* EOF marker: marque la fin d'une serie
 			(la fin des headers dans une requete) */
-		else if ((unsigned char)m->buf[0] == 254) {
-			m->warnings = from_my_16(&m->buf[1]);
-			m->status = from_my_16(&m->buf[3]);
+		else if ((unsigned char)m->read[0] == 254) {
+			m->warnings = uint2korr(&m->read[1]);
+			m->status = uint2korr(&m->read[3]);
 			m->eof = 1;
 			return MYSAC_RET_EOF;
 		}
 	
 		/* success */
-		else if ((unsigned char)m->buf[0] == 0) {
+		else if ((unsigned char)m->read[0] == 0) {
 	
 			/* affected rows (wireshark donne 1 octet, mais en affiche 2 ...) */
-			m->affected_rows = from_my_16(&m->buf[1]);
+			m->affected_rows = uint2korr(&m->read[1]);
 	
 			/* server status */
-			m->status = from_my_16(&m->buf[3]);
+			m->status = uint2korr(&m->read[3]);
 	
-			/* server status */
-			m->warnings = from_my_16(&m->buf[5]);
+			/* server warnings */
+			m->warnings = uint2korr(&m->read[5]);
 	
 			return MYSAC_RET_OK;
 		}
@@ -257,6 +232,7 @@ int mysac_connect(MYSAC *mysac) {
 		mysac->qst = MYSAC_READ_GREATINGS;
 		mysac->len = 0;
 		mysac->readst = 0;
+		mysac->read = mysac->buf;
 
 	/***********************************************
 	 read greatings
@@ -294,20 +270,20 @@ int mysac_connect(MYSAC *mysac) {
 		i++;
 
 		/* thread id */
-		mysac->threadid = from_my_32(&mysac->buf[i]);
+		mysac->threadid = uint4korr(&mysac->buf[i]);
 
 		/* first part of salt */
 		strncpy(mysac->salt, &mysac->buf[i+4], SCRAMBLE_LENGTH_323);
 		i += 4 + SCRAMBLE_LENGTH_323 + 1;
 
 		/* options */
-		mysac->options = from_my_16(&mysac->buf[i]);
+		mysac->options = uint2korr(&mysac->buf[i]);
 
 		/* charset */
 		mysac->charset = mysac->buf[i+2];
 
 		/* server status */
-		mysac->status = from_my_16(&mysac->buf[i+3]);
+		mysac->status = uint2korr(&mysac->buf[i+3]);
 
 		/* salt part 2 */
 		strncpy(mysac->salt + SCRAMBLE_LENGTH_323, &mysac->buf[i+5+13],
@@ -368,7 +344,8 @@ int mysac_connect(MYSAC *mysac) {
 		}
 		
 		/* Add database if needed */
-		if (mysac->options & CLIENT_CONNECT_WITH_DB) {
+		if ((mysac->options & CLIENT_CONNECT_WITH_DB) && 
+		    (mysac->database != NULL)) {
 			/* TODO : debordement de buffer */
 			len = strlen(mysac->database);
 			memcpy(&mysac->buf[i], mysac->database, len);
@@ -398,6 +375,7 @@ int mysac_connect(MYSAC *mysac) {
 
 		mysac->qst = MYSAC_RECV_AUTH_1;
 		mysac->readst = 0;
+		mysac->read = mysac->buf;
 
 	/***********************************************
 	 read response 1
@@ -523,6 +501,7 @@ int mysac_send_database(MYSAC *mysac) {
 			return MYSAC_WANT_WRITE;
 		mysac->qst = MYSAC_RECV_INIT_DB;
 		mysac->readst = 0;
+		mysac->read = mysac->buf;
 	
 	/**********************************************************
 	*
@@ -549,6 +528,185 @@ int mysac_send_database(MYSAC *mysac) {
 		}
 	}
 }
+
+int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...) {
+	va_list ap;
+	int len;
+
+	/* set packet number */
+	mysac->buf[3] = 0;
+
+	/* set mysql command */
+	mysac->buf[4] = COM_STMT_PREPARE;
+
+	/* build sql query */
+	va_start(ap, fmt);
+	len = vsnprintf(&mysac->buf[5], MYSAC_BUFFER_SIZE-5, fmt, ap);
+	if (len >= MYSAC_BUFFER_SIZE - 5)
+		return -1;
+
+	/* len */
+	to_my_3(len + 1, &mysac->buf[0]);
+
+	/* send params */
+	mysac->send = mysac->buf;
+	mysac->len = len + 5;
+	mysac->qst = MYSAC_SEND_STMT_QUERY;
+
+	return 0;
+}
+
+int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id) {
+	int err;
+	int errcode;
+
+	switch (mysac->qst) {
+
+	/**********************************************************
+	*
+	* send query on network
+	*
+	**********************************************************/
+	case MYSAC_SEND_STMT_QUERY:
+		err = mysac_write(mysac->fd, mysac->send, mysac->len, &errcode);
+
+		if (err == -1)
+			return errcode;
+
+		mysac->len -= err;
+		mysac->send += err;
+		if (mysac->len > 0)
+			return MYSAC_WANT_WRITE;
+		mysac->qst = MYSAC_RECV_STMT_QUERY;
+		mysac->readst = 0;
+		mysac->read = mysac->buf;
+	
+	/**********************************************************
+	*
+	* receive
+	*
+	**********************************************************/
+	case MYSAC_RECV_STMT_QUERY:
+		err = my_response(mysac);
+
+		if (err == MYSAC_WANT_READ)
+			return MYSAC_WANT_READ;
+
+		/* error */
+		if (err == MYSAC_RET_ERROR)
+			return mysac->errorcode;
+
+		/* protocol error */
+		if (err != MYSAC_RET_OK) {
+			/* TODO: pas la bonne erreur */
+			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
+			return mysac->errorcode;
+		}
+
+		/* get statement id */
+		*stmt_id = uint4korr(&mysac->buf[1]);
+
+		/* get nb of columns */
+		/* TODO prendre en compte cette valeur plus tard */
+		/* mysac->nb_cols = mysac->buf[5]; */
+		mysac->res = *(MYSAC_RES **)&mysac->buf[5];
+
+		mysac->read_id = 0;
+
+		mysac->qst = MYSAC_RECV_QUERY_COLDESC;
+
+	/**********************************************************
+	*
+	* receive column description
+	*
+	**********************************************************/
+	case_MYSAC_RECV_QUERY_COLDESC_2:
+	mysac->readst = 0;
+
+	case MYSAC_RECV_QUERY_COLDESC:
+
+		err = my_response(mysac);
+
+		if (err == MYSAC_WANT_READ)
+			return MYSAC_WANT_READ;
+
+		/* error */
+		if (err == MYSAC_RET_ERROR)
+			return mysac->errorcode;
+
+		/* protocol error */
+		else if (err != MYSAC_RET_DATA) {
+			/* TODO: pas la bonne erreur */
+			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
+			return mysac->errorcode;
+		}
+
+		/* TODO: voir plus atrd pour deceoder ça ... */
+		/* mysac_decode_field(mysac, &mysac->cols[mysac->read_id]); */
+
+		/* TODO ... un peu pourri */
+		mysac->read_id++;
+		/* if (mysac->read_id < mysac->nb_cols) */
+		if (mysac->read_id < (int)mysac->res)
+			goto case_MYSAC_RECV_QUERY_COLDESC_2;
+		
+		mysac->readst = 0;
+		mysac->qst = MYSAC_RECV_QUERY_EOF1;
+		mysac->read = mysac->buf;
+	
+	/**********************************************************
+	*
+	* receive EOF
+	*
+	**********************************************************/
+	case MYSAC_RECV_QUERY_EOF1:
+		err = my_response(mysac);
+
+		if (err == MYSAC_WANT_READ)
+			return MYSAC_WANT_READ;
+
+		/* error */
+		if (err == MYSAC_RET_ERROR)
+			return mysac->errorcode;
+
+		/* protocol error */
+		else if (err != MYSAC_RET_EOF) {
+			/* TODO: pas la bonne erreur */
+			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
+			return mysac->errorcode;
+		}
+
+		return 0;
+	}
+}
+
+
+
+int mysac_set_stmt_execute(MYSAC *mysac, unsigned long stmt_id) {
+	va_list ap;
+	int len;
+
+	/* set packet number */
+	mysac->buf[3] = 0;
+
+	/* len */
+	to_my_3(5, &mysac->buf[0]);
+
+	/* set mysql command */
+	mysac->buf[4] = COM_STMT_EXECUTE;
+
+	/* build sql query */
+	to_my_4(stmt_id, &mysac->buf[5]);
+
+	/* send params */
+	mysac->send = mysac->buf;
+	mysac->len = 9;
+	mysac->qst = MYSAC_SEND_QUERY;
+
+	return 0;
+}
+
+
 
 int mysac_set_query(MYSAC *mysac, const char *fmt, ...) {
 	va_list ap;
@@ -577,13 +735,14 @@ int mysac_set_query(MYSAC *mysac, const char *fmt, ...) {
 	return 0;
 }
 
-
 int mysac_send_query(MYSAC *mysac) {
 	int err;
 	int errcode;
-	int i;
-	uint32_t size;
+	int i, j;
+	unsigned long size;
 	char nul;
+	int use_stmt_fmt;
+	char c;
 
 	switch (mysac->qst) {
 
@@ -604,12 +763,28 @@ int mysac_send_query(MYSAC *mysac) {
 			return MYSAC_WANT_WRITE;
 		mysac->qst = MYSAC_RECV_QUERY_COLNUM;
 		mysac->readst = 0;
+		mysac->read = mysac->buf;
 	
 	/**********************************************************
 	*
 	* receive
 	*
 	**********************************************************/
+
+	/* prepare struct 
+
+	 +-------------------+---------------+-----------------+
+	 | struct mysac_resp | MYSQL_FIELD[] | char[]          |
+	 |                   | resp->nb_cols | all fields name |
+	 +-------------------+---------------+-----------------+
+
+	 */
+	mysac->res = (MYSAC_RES *)mysac->read;
+	mysac->res->nb_lines = 0;
+	mysac->res->cols = (MYSQL_FIELD *)(mysac->read + sizeof(MYSAC_RES));
+	INIT_LIST_HEAD(&mysac->res->data);
+	mysac->read += sizeof(MYSAC_RES);
+
 	case MYSAC_RECV_QUERY_COLNUM:
 		err = my_response(mysac);
 
@@ -622,14 +797,14 @@ int mysac_send_query(MYSAC *mysac) {
 
 		/* protocol error */
 		else if (err != MYSAC_RET_DATA) {
-			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR; /* TODO: pas la bonne erreur */
+			/* TODO: pas la bonne erreur */
+			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
 			return mysac->errorcode;
 		}
 
 		/* get nb col TODO: pas sur que ce soit un byte */
-		mysac->nb_cols = mysac->buf[0];
+		mysac->res->nb_cols = mysac->read[0];
 		mysac->read_id = 0;
-		
 		mysac->qst = MYSAC_RECV_QUERY_COLDESC;
 	
 	/**********************************************************
@@ -637,6 +812,10 @@ int mysac_send_query(MYSAC *mysac) {
 	* receive column description
 	*
 	**********************************************************/
+
+	/* prepare cols space */
+	mysac->read += sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
+
 	case_MYSAC_RECV_QUERY_COLDESC:
 	mysac->readst = 0;
 
@@ -653,115 +832,15 @@ int mysac_send_query(MYSAC *mysac) {
 
 		/* protocol error */
 		else if (err != MYSAC_RET_DATA) {
-			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR; /* TODO: pas la bonne erreur */
+			/* TODO: pas la bonne erreur */
+			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
 			return mysac->errorcode;
 		}
 
-		/*
-		VERSION 4.0
-		 Bytes                      Name
-		 -----                      ----
-		 n (Length Coded String)    table
-		 n (Length Coded String)    name
-		 4 (Length Coded Binary)    length
-		 2 (Length Coded Binary)    type
-		 2 (Length Coded Binary)    flags
-		 1                          decimals
-		 n (Length Coded Binary)    default
-		 
-		 -> VERSION 4.1
-		 Bytes                      Name
-		 -----                      ----
-		 n (Length Coded String)    catalog
-		 n (Length Coded String)    db
-		 n (Length Coded String)    table
-		 n (Length Coded String)    org_table
-		 n (Length Coded String)    name
-		 n (Length Coded String)    org_name
-		 1                          (filler)
-		 2                          charsetnr
-		 4                          length
-		 1                          type
-		 2                          flags
-		 1                          decimals
-		 2                          (filler), always 0x00
-		 n (Length Coded Binary)    default
-		*/
-	
-		mysac->cols[mysac->read_id].mf.org_name = "";
-		mysac->cols[mysac->read_id].mf.table = "";
-		mysac->cols[mysac->read_id].mf.org_table = "";
-		mysac->cols[mysac->read_id].mf.db = "";
-		mysac->cols[mysac->read_id].mf.catalog = "";
-		mysac->cols[mysac->read_id].mf.def = "";
-		mysac->cols[mysac->read_id].mf.org_name_length = 0;
-		mysac->cols[mysac->read_id].mf.table_length = 0;
-		mysac->cols[mysac->read_id].mf.org_table_length = 0;
-		mysac->cols[mysac->read_id].mf.db_length = 0;
-		mysac->cols[mysac->read_id].mf.catalog_length = 0;
-		mysac->cols[mysac->read_id].mf.def_length = 0;
-	
-		i = 0;
-
-		/* n (Length Coded String)    catalog */
-		i += my_lcb(&mysac->buf[i], &size, &nul);
-		i += size;
-	
-		/* n (Length Coded String)    db */
-		i += my_lcb(&mysac->buf[i], &size, &nul);
-		i += size;
-	
-		/* n (Length Coded String)    table */
-		i += my_lcb(&mysac->buf[i], &size, &nul);
-		i += size;
-	
-		/* n (Length Coded String)    org_table */
-		i += my_lcb(&mysac->buf[i], &size, &nul);
-		i += size;
-	
-		/* n (Length Coded String)    name */
-		i += my_lcb(&mysac->buf[i], &size, &nul);
-		strncpyz(mysac->cols[mysac->read_id].colname, &mysac->buf[i], size);
-		mysac->cols[mysac->read_id].mf.name = mysac->cols[mysac->read_id].colname;
-		mysac->cols[mysac->read_id].mf.name_length = size;
-		i += size;
-	
-		/* n (Length Coded String)    org_name */
-		i += my_lcb(&mysac->buf[i], &size, &nul);
-		i += size;
-	
-		/* (filler) */
-		i += 1;
-	
-		/* charset */
-		mysac->cols[mysac->read_id].mf.charsetnr = from_my_16(&mysac->buf[i]);
-		i += 2;
-	
-		/* length */
-		mysac->cols[mysac->read_id].mf.length = from_my_32(&mysac->buf[i]);
-		i += 4;
-	
-		/* type */
-		mysac->cols[mysac->read_id].mf.type = mysac->buf[i];
-		i += 1;
-	
-		/* flags */
-		mysac->cols[mysac->read_id].mf.flags = from_my_24(&mysac->buf[i]);
-		i += 2;
-	
-		/* decimals */
-		mysac->cols[mysac->read_id].mf.decimals = mysac->buf[i];
-		i += 1;
-	
-		/* filler */
-		i += 2;
-	
-		/* default */
-		i += my_lcb(&mysac->buf[i], &size, &nul);
-		i += size;
+		mysac_decode_field(mysac, &mysac->res->cols[mysac->read_id]);
 
 		mysac->read_id++;
-		if (mysac->read_id < mysac->nb_cols)
+		if (mysac->read_id < mysac->res->nb_cols)
 			goto case_MYSAC_RECV_QUERY_COLDESC;
 		
 		mysac->readst = 0;
@@ -792,15 +871,81 @@ int mysac_send_query(MYSAC *mysac) {
 
 	/**********************************************************
 	*
-	* read data
+	* read data lines
 	*
 	**********************************************************/
 	case_MYSAC_RECV_QUERY_DATA:
+
+	/*
+	   +-------------------+----------------+-----------------+----------------+
+		| struct mysac_rows | MYSAC_ROW[]    | unsigned long[] | struct tm[]    |
+		|                   | mysac->nb_cols | mysac->nb_cols  | mysac->nb_time |
+	   +-------------------+----------------+-----------------+----------------+
+	 */
+
+	/* reserve space for MYSAC_ROWS and add it into chained list */
+	mysac->res->cr = (MYSAC_ROWS *)mysac->read;
+	list_add_tail(&mysac->res->cr->link, &mysac->res->data);
+	mysac->read += sizeof(MYSAC_ROWS);
+
+	/* space for each field definition into row */
+	mysac->res->cr->data = (MYSAC_ROW *)mysac->read;
+	mysac->read += sizeof(MYSAC_ROW) * mysac->res->nb_cols;
+
+	/* space for length table */
+	mysac->res->cr->lengths = (unsigned long *)mysac->read;
+	mysac->read += sizeof(unsigned long) * mysac->res->nb_cols;
+
+	/* struct tm */
+	for (i=0; i<mysac->res->nb_cols; i++) {
+		switch(mysac->res->cols[i].type) {
+		case MYSQL_TYPE_TIME:
+		case MYSQL_TYPE_YEAR:
+		case MYSQL_TYPE_TIMESTAMP:
+		case MYSQL_TYPE_DATETIME:
+		case MYSQL_TYPE_DATE:
+			mysac->res->cr->data[i].tm = (struct tm *)mysac->read;
+			mysac->read += sizeof(struct tm);
+		}
+	}
+
+	/* set state at 0 */
 	mysac->readst = 0;
 
 	case MYSAC_RECV_QUERY_DATA:
-		exit(0);
+		err = my_response(mysac);
 
+		if (err == MYSAC_WANT_READ)
+			return MYSAC_WANT_READ;
+
+		/* error */
+		else if (err == MYSAC_RET_ERROR)
+			return mysac->errorcode;
+
+		/* EOF */
+		else if (err == MYSAC_RET_EOF) {
+			list_del(&mysac->res->cr->link);
+			mysac->res->cr = NULL;
+			return 0;
+		}
+
+		/* read data in string type */
+		else if (err == MYSAC_RET_DATA)
+			mysac_decode_string_row(mysac);
+
+		/* read data in binary type */
+		else if (err == MYSAC_RET_OK)
+			mysac_decode_binary_row(mysac);
+
+		/* protocol error */
+		else {
+			/* TODO: pas la bonne erreur */
+			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
+			return mysac->errorcode;
+		}
+
+		/* next line */
+		goto case_MYSAC_RECV_QUERY_DATA;
 	}
 }
 

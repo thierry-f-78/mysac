@@ -8,6 +8,7 @@
 
 struct my {
 	MYSAC m;
+	unsigned long stmt_id;
 	int state;
 };
 
@@ -77,6 +78,8 @@ const char *my_flags[] = {
 	[ZEROFILL_FLAG] = "ZEROFILL_FLAG",
 	[BINARY_FLAG] = "BINARY_FLAG"
 };
+
+char *database;
 
 const char big_query[] =
     //"SELECT COUNT(*) FROM (\n"
@@ -186,375 +189,201 @@ const char big_query[] =
     "  SVCID\n"
     "\n"
     "ORDER BY GROUPES, MACHINES, SERVICES\n"
-	 "LIMIT 0,30\n"
+	 //"LIMIT 0,30\n"
     //") AS sub2\n"
 	 ;
-
-#if 0
-void my_response(int fd, void *arg);
-void my_auth_response(int fd, void *arg);
-void my_select_db_response(int fd, void *arg);
-void my_query_response(int fd, void *arg);
-
-static void strncpyz(char *d, char *s, int l) {
-	memcpy(d, s, l);
-	d[l] = '\0';
-}
-
-void my_read_value(struct my *m) {
-	uint32_t size;
-	char nul;
-	int i = 0;
-	int j;
-
-	for (j=0; j<m->nb_cols; j++) {
-		fprintf(stderr, "val col %d: ", j);
-		i += my_lcb(&m->buf[i], &size,  &nul);
-		if (nul == 1)
-			fprintf(stderr, "(null)");
-		else {
-			write(2, &m->buf[i], size);
-			i += size;
-		}
-		fprintf(stderr, "\n");
-	}
-	fprintf(stderr, "-----------------------------\n");
-}
-
-void my_read_def(struct my *m) {
-	int l;
-	int i = 0;
-	int j;
-	int flag;
-	uint32_t size;
-	char nul;
-	/*
-	VERSION 4.0
-	 Bytes                      Name
-	 -----                      ----
-	 n (Length Coded String)    table
-	 n (Length Coded String)    name
-	 4 (Length Coded Binary)    length
-	 2 (Length Coded Binary)    type
-	 2 (Length Coded Binary)    flags
-	 1                          decimals
-	 n (Length Coded Binary)    default
-	 
-	 -> VERSION 4.1
-	 Bytes                      Name
-	 -----                      ----
-	 n (Length Coded String)    catalog
-	 n (Length Coded String)    db
-	 n (Length Coded String)    table
-	 n (Length Coded String)    org_table
-	 n (Length Coded String)    name
-	 n (Length Coded String)    org_name
-	 1                          (filler)
-	 2                          charsetnr
-	 4                          length
-	 1                          type
-	 2                          flags
-	 1                          decimals
-	 2                          (filler), always 0x00
-	 n (Length Coded Binary)    default
-	*/
-
-	/* n (Length Coded String)    catalog */
-	i += my_lcb(&m->buf[i], &size, &nul);
-	fprintf(stderr, "catalog: [");
-	write(2, &m->buf[i], size);
-	write(2, "]\n", 2);
-	i += size;
-
-	/* n (Length Coded String)    db */
-	i += my_lcb(&m->buf[i], &size, &nul);
-	fprintf(stderr, "db: [");
-	write(2, &m->buf[i], size);
-	write(2, "]\n", 2);
-	i += size;
-
-	/* n (Length Coded String)    table */
-	i += my_lcb(&m->buf[i], &size, &nul);
-	fprintf(stderr, "table: [");
-	write(2, &m->buf[i], size);
-	write(2, "]\n", 2);
-	i += size;
-
-	/* n (Length Coded String)    org_table */
-	i += my_lcb(&m->buf[i], &size, &nul);
-	fprintf(stderr, "org_table: [");
-	write(2, &m->buf[i], size);
-	write(2, "]\n", 2);
-	i += size;
-
-	/* n (Length Coded String)    name */
-	i += my_lcb(&m->buf[i], &size, &nul);
-	strncpyz(m->cols[m->read_id].name, &m->buf[i], size);
-	fprintf(stderr, "name: [%s]\n", m->cols[m->read_id].name);
-	i += size;
-
-	/* n (Length Coded String)    org_name */
-	i += my_lcb(&m->buf[i], &size, &nul);
-	fprintf(stderr, "org_name: [");
-	write(2, &m->buf[i], size);
-	write(2, "]\n", 2);
-	i += size;
-
-	/* (filler) */
-	i += 1;
-
-	/* charset */
-	m->cols[m->read_id].charsetnr = from_my_16(&m->buf[i]);
-	i += 2;
-	fprintf(stderr, "charset: %d\n", m->cols[m->read_id].charsetnr);
-
-	/* length */
-	m->cols[m->read_id].length = from_my_32(&m->buf[i]);
-	i += 4;
-	fprintf(stderr, "length: %d\n", m->cols[m->read_id].length);
-
-	/* type */
-	m->cols[m->read_id].type = m->buf[i];
-	i += 1;
-	fprintf(stderr, "type: %d: %s\n", m->cols[m->read_id].type,
-	        my_type[m->cols[m->read_id].type]);
-
-	/* flags */
-	m->cols[m->read_id].flags = from_my_24(&m->buf[i]);
-	i += 2;
-	fprintf(stderr, "flags: {");
-	if ((flag & NOT_NULL_FLAG) != 0)
-		fprintf(stderr, "NOT_NULL_FLAG, ");
-	if ((flag & PRI_KEY_FLAG) != 0)
-		fprintf(stderr, "PRI_KEY_FLAG, ");
-	if ((flag & UNIQUE_KEY_FLAG) != 0)
-		fprintf(stderr, "UNIQUE_KEY_FLAG, ");
-	if ((flag & MULTIPLE_KEY_FLAG) != 0)
-		fprintf(stderr, "MULTIPLE_KEY_FLAG, ");
-	if ((flag & BLOB_FLAG) != 0)
-		fprintf(stderr, "BLOB_FLAG, ");
-	if ((flag & UNSIGNED_FLAG) != 0)
-		fprintf(stderr, "UNSIGNED_FLAG, ");
-	if ((flag & ZEROFILL_FLAG) != 0)
-		fprintf(stderr, "ZEROFILL_FLAG, ");
-	if ((flag & BINARY_FLAG) != 0)
-		fprintf(stderr, "BINARY_FLAG, ");
-	if ((flag & ENUM_FLAG) != 0)
-		fprintf(stderr, "ENUM_FLAG, ");
-	if ((flag & AUTO_INCREMENT_FLAG) != 0)
-		fprintf(stderr, "AUTO_INCREMENT_FLAG, ");
-	if ((flag & TIMESTAMP_FLAG) != 0)
-		fprintf(stderr, "TIMESTAMP_FLAG, ");
-	if ((flag & SET_FLAG) != 0)
-		fprintf(stderr, "SET_FLAG, ");
-	if ((flag & NO_DEFAULT_VALUE_FLAG) != 0)
-		fprintf(stderr, "NO_DEFAULT_VALUE_FLAG, ");
-	if ((flag & NUM_FLAG) != 0)
-		fprintf(stderr, "NUM_FLAG, ");
-	if ((flag & PART_KEY_FLAG) != 0)
-		fprintf(stderr, "PART_KEY_FLAG, ");
-	if ((flag & GROUP_FLAG) != 0)
-		fprintf(stderr, "GROUP_FLAG, ");
-	fprintf(stderr, "}\n");
-
-	/* decimals */
-	m->cols[m->read_id].decimals = m->buf[i];
-	fprintf(stderr, "decimals: %d\n", m->cols[m->read_id].decimals);
-	i += 1;
-
-	/* filler */
-	i += 2;
-
-	/* default */
-	i += my_lcb(&m->buf[i], &size, &nul);
-	i += size;
-
-	fprintf(stderr, "-----------------------------\n");
-}
-int c = 0;
-void my_response(int fd, void *arg) {
-	struct my *m = arg;
-	int i;
-
-	/* read length */
-	read(fd, m->buf, 4);
-
-	/* decode */
-	m->packet_length = from_my_24(&m->buf[0]);
-
-	/* packet number */
-	m->packet_number = m->buf[3];
-
-	/* read data */
-	read(fd, m->buf, m->packet_length);
-
-	/* re-init eof */
-	m->eof = 1;
-
-	/* error */
-	if ((unsigned char)m->buf[0] == 255) {
-	
-		/* defined mysql error */
-		if (m->packet_length > 3) {
-
-			/* read error code */
-			m->errorcode = from_my_16(&m->buf[1]);
-
-			/* write error msg */
-			write (2, &m->buf[3], m->packet_length - 3);
-			write (2, "\n", 1);
-			exit(1);
-		}
-
-		/* unknown error */
-		else
-			exit(1);
-	}
-
-	/* EOF marker: marque la fin d'une serie
-	   (la fin des headers dans une requete) */
-	else if ((unsigned char)m->buf[0] == 254) {
-		m->warnings = from_my_16(&m->buf[1]);
-		m->status = from_my_16(&m->buf[3]);
-		m->eof = 1;
-		if (m->qst == MY_READ_LINE) {
-			if (c == 1)
-				exit(0);
-			else
-				c++;
-		}
-	}
-
-	/* success */
-	else if ((unsigned char)m->buf[0] == 0) {
-
-		/* affected rows (wireshark donne 1 octet, mais en affiche 2 ...) */
-		m->affected_rows = from_my_16(&m->buf[1]);
-
-		/* server status */
-		m->status = from_my_16(&m->buf[3]);
-
-		/* server status */
-		m->warnings = from_my_16(&m->buf[5]);
-	}
-
-	/* read response ... 
-	 *
-	 * Result Set Packet           1-250 (first byte of Length-Coded Binary)
-	 * Field Packet                1-250 ("")
-	 * Row Data Packet             1-250 ("")
-	 */
-	else {
-
-		switch (m->qst) {
-
-		/* nombre de colonnes */
-		case MY_READ_NUM:
-			m->nb_cols = m->buf[0];
-			m->read_id = 0;
-			m->qst = MY_READ_HEADER;
-			break;
-
-		/* lecture des headers de colonnes */
-		case MY_READ_HEADER:
-			my_read_def(m);
-			m->read_id++;
-			if (m->read_id == m->nb_cols) {
-				m->read_id = 0;
-				m->qst = MY_READ_LINE;
-			}
-			break;
-
-		/* lecture de chaque lignes */
-		case MY_READ_LINE:
-			my_read_value(m);
-			break;
-		}
-	}
-}
-
-
-
-void my_auth_response(int fd, void *arg) {
-	struct my *m = arg;
-
-	my_response(fd, m);
-
-	/*
-	  By sending this very specific reply server asks us to send scrambled
-	  password in old format.
-	*/
-	if (m->packet_length == 1 && m->eof == 1 && 
-	    m->options & CLIENT_SECURE_CONNECTION) {
-		ev_poll_fd_clr(fd, EV_POLL_READ);
-		ev_poll_fd_set(fd, EV_POLL_WRITE, my_auth2, arg);
-	}
-
-	/* if no error, continue program */
-	else {
-		ev_poll_fd_clr(fd, EV_POLL_READ);
-		ev_poll_fd_set(fd, EV_POLL_WRITE, my_select_database, arg);
-	}
-}
-
-void my_select_db_response(int fd, void *arg) {
-	my_response(fd, arg);
-	ev_poll_fd_clr(fd, EV_POLL_READ);
-	ev_poll_fd_set(fd, EV_POLL_WRITE, my_send_query, arg);
-}
-
-void my_query_response(int fd, void *arg) {
-	my_response(fd, arg);
-}
-
-#endif
+const char *query;
 
 enum a {
 	CONNECT,
 	SETDB,
+	STMT,
 	QUERY,
 };
 
 void mysac_main(int fd, void *arg) {
 	struct my *my;
 	MYSAC *m;
-	int err;
+	MYSAC_ROW *r;
+	int err, j, i;
+	struct timeval avant;
+	struct timeval apres;
+	struct timeval display;
 	
 	my = arg;
 	m = &my->m;
 
 	switch ((enum a)my->state) {
 
-	/* connect state */
+	/**************************************************
+
+	  connect state
+
+	**************************************************/
 	case CONNECT:
 		err = mysac_connect(m);
 		if (err != 0) break;
 		fprintf(stderr, "connection / authentication sucessfull\n");
 
 		/* prepare set db */
-		//mysac_set_database(m, "tests");
-		mysac_set_database(m, "nagios");
+		mysac_set_database(m, database);
 		my->state = SETDB;
 
-	/* set database */
+	/**************************************************
+
+	  set database
+
+	**************************************************/
 	case SETDB:
 		err = mysac_send_database(m);
 		if (err != 0) break;
-		fprintf(stderr, "database send\n");
 
-		/* preapare query */
+		/* prepare query */
+		my->state = STMT;
+		err = mysac_set_stmt_prepare(m, query);
+		if (err != 0) break;
+
+	/**************************************************
+
+	   prepare statement 
+
+	**************************************************/ 
+	case STMT:
+		err = mysac_send_stmt_prepare(m, &my->stmt_id);
+		if (err != 0) break;
+
+		mysac_set_stmt_execute(m, my->stmt_id);
 		my->state = QUERY;
-		// err = mysac_set_query(m, "SELECT COUNT(*) AS COUNT FROM test");
-		err = mysac_set_query(m, big_query);
-		if (err != 0) break;
-	
-	/* send query */
+
+	/**************************************************
+
+	  send query
+
+	**************************************************/
+	case_QUERY:
 	case QUERY:
-		err = mysac_send_query(m);
+		gettimeofday(&avant, NULL);
+
+		err = mysac_send_stmt_execute(m);
 		if (err != 0) break;
-		fprintf(stderr, "request sended\n");
-		exit(9);
+
+#if 1
+		fprintf(stderr, "request return ok\n");
+		fprintf(stderr, "%d lines\n", mysac_num_rows(m->res));
+
+		i = 0;
+		while (1) {	
+			struct tm *_tm;
+			char toto[1024];
+			MYSQL_FIELD *mf;
+	
+			/* get line */
+			r = mysac_fetch_row(m->res);
+			if (r == NULL)
+				break;
+
+			/* display line */
+			fprintf(stderr, "%d: ", i);
+			for (j=0; j<mysac_field_count(m->res); j++) {
+
+				mf = &m->res->cols[j];
+				fprintf(stderr, "%s\t%s\t", mf->name, mysac_type[mf->type]);
+
+				switch (mf->type) {
+	
+				/* read blob */
+				case MYSQL_TYPE_TINY_BLOB:
+				case MYSQL_TYPE_MEDIUM_BLOB:
+				case MYSQL_TYPE_LONG_BLOB:
+				case MYSQL_TYPE_BLOB:
+				/* eviter d'utiliser ce type a la con ! (enfin, aml defini quoi ...
+				   il sert peut etre pour les very very bit int (clé de chiffrement */
+				case MYSQL_TYPE_NEWDECIMAL:
+				/* .... */
+				case MYSQL_TYPE_BIT:
+				/* read text */
+				case MYSQL_TYPE_STRING:
+				case MYSQL_TYPE_VAR_STRING:
+					fprintf(stderr, "(%p) [", m->res->cr->data[j].string);
+					fwrite(m->res->cr->data[j].string, 1, m->res->cr->lengths[j], stderr);
+					fprintf(stderr, "]\n");
+					break;
+		
+				case MYSQL_TYPE_TINY:
+					fprintf(stderr, "%d\n", m->res->cr->data[j].stiny);
+					break;
+		
+				case MYSQL_TYPE_SHORT:
+					fprintf(stderr, "%d\n", m->res->cr->data[j].ssmall);
+					break;
+		
+				case MYSQL_TYPE_INT24:
+				case MYSQL_TYPE_LONG:
+					fprintf(stderr, "%ld\n", m->res->cr->data[j].sint);
+					break;
+		
+				case MYSQL_TYPE_LONGLONG:
+					fprintf(stderr, "%lld\n", m->res->cr->data[j].sbigint);
+					break;
+		
+				case MYSQL_TYPE_FLOAT:
+					fprintf(stderr, "%f\n", m->res->cr->data[j].mfloat);
+					break;
+		
+				case MYSQL_TYPE_DOUBLE:
+					fprintf(stderr, "%f\n", m->res->cr->data[j].mdouble);
+					break;
+		
+				case MYSQL_TYPE_TIME:
+					fprintf(stderr, "%d.%06d\n", m->res->cr->data[j].tv.tv_sec,
+					                             m->res->cr->data[j].tv.tv_usec);
+					break;
+		
+				case MYSQL_TYPE_YEAR:
+				case MYSQL_TYPE_TIMESTAMP:
+				case MYSQL_TYPE_DATETIME:
+				case MYSQL_TYPE_DATE:
+					strftime(toto, 1024, "%Y-%m-%d %H:%M:%S",
+					         m->res->cr->data[j].tm);
+					fprintf(stderr, "%s\n", toto);
+					break;
+		
+				case MYSQL_TYPE_NULL:
+				case MYSQL_TYPE_DECIMAL:
+				case MYSQL_TYPE_NEWDATE:
+				case MYSQL_TYPE_VARCHAR:
+				case MYSQL_TYPE_ENUM:
+				case MYSQL_TYPE_SET:
+				case MYSQL_TYPE_GEOMETRY:
+					break;
+				}
+			}
+			i++;
+		}
+#endif
+
+		gettimeofday(&apres, NULL);
+		display.tv_sec = apres.tv_sec - avant.tv_sec;
+		display.tv_usec = apres.tv_usec - avant.tv_usec;
+		if (display.tv_usec < 0) {
+			display.tv_usec += 1000000;
+			display.tv_sec --;
+		}
+		fprintf(stderr, "%d.%06d\n", display.tv_sec, display.tv_usec);
+
+		// err = mysac_set_query(m, big_query);
+		err = mysac_set_stmt_execute(m, my->stmt_id);;
+		if (err != 0) break;
+//		goto case_QUERY;
+
+		exit(0);
 	}
+
+	/**************************************************
+
+	  return code
+
+	**************************************************/
 
 	/* want read */
 	if (err == MYSAC_WANT_READ) {
@@ -570,7 +399,7 @@ void mysac_main(int fd, void *arg) {
 
 	/* error */
 	else if (err != 0) {
-		fprintf(stderr, "error(%d): %s\n", err, mysac_error(m));
+		fprintf(stderr, "error(%d): %s %s\n", err, mysac_error(m), m->mysql_error);
 		exit (1);
 	}
 }
@@ -579,6 +408,16 @@ int main(int argc, char *argv[]) {
 	struct ev_timeout_basic_node tmout;
 	struct my my;
 	MYSAC *m;
+
+	if (argc == 2)
+		query = argv[1];
+
+	else
+//		query = "CALL search()";
+//		query = big_query;
+		query = "SELECT * FROM toto"; /* retourne tous les types */
+//		query = "SELECT TIMEDIFF(NOW(), test.ze_date) AS DIFF FROM test";
+//		query = "SELECT COUNT(*) AS COUNT FROM test;";
 
 	/* init sheduling */
 	poll_select_register();
@@ -592,7 +431,10 @@ int main(int argc, char *argv[]) {
 
 	//mysac_setup(m, "127.0.0.1:4000", "hypervisor", "PuuQuae6", "nagios", 0);
 	//mysac_setup(m, "127.0.0.1:3306", "root", "root", "nagios", 0);
-	mysac_setup(m, "127.0.0.1:3306", "root", "root", "test", 0);
+	mysac_setup(m, "127.0.0.1:3306", "root", "root", NULL, 0);
+
+	// database = "nagios";
+	database = "tests";
 	mysac_connect(m);
 
 	/* call connect */
@@ -602,12 +444,5 @@ int main(int argc, char *argv[]) {
 	ev_poll_poll(1);
 
 
-	/*
-	if (argc == 2)
-		m->query = argv[1];
-	else
-		*/
-		//m.query = "SELECT TIMEDIFF(NOW(), test.ze_date) AS DIFF, * FROM test;";
-		//m.query = "SELECT COUNT(*) AS COUNT FROM test;";
 
 }
