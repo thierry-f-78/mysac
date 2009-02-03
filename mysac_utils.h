@@ -3,28 +3,66 @@
 
 #include <stdint.h>
 
+#include "mysac.h"
+
+/* definitions imported from linux-2.6.24/include/linux/list.h */
+
+static inline void INIT_LIST_HEAD(struct list_head *list) {
+	list->next = list;
+	list->prev = list;
+}
+
 /*
-static inline float from_my_float_32(char *m) {
-	uint32_t i;
-	i  = (unsigned char)m[3]; i <<= 8;
-	i |= (unsigned char)m[2]; i <<= 8;
-	i |= (unsigned char)m[1]; i <<= 8;
-	i |= (unsigned char)m[0];
-	return *(float *)&i;
+ * Insert a new entry between two known consecutive entries.
+ *
+ * This is only for internal list manipulation where we know
+ * the prev/next entries already!
+ */
+static inline void __list_add(struct list_head *new,
+                              struct list_head *prev,
+                              struct list_head *next) {
+	next->prev = new;
+	new->next = next;
+	new->prev = prev;
+	prev->next = new;
 }
-static inline double from_my_float_64(char *m) {
-	uint64_t i;
-	i  = (unsigned char)m[7]; i <<= 8;
-	i |= (unsigned char)m[6]; i <<= 8;
-	i |= (unsigned char)m[5]; i <<= 8;
-	i |= (unsigned char)m[4]; i <<= 8;
-	i |= (unsigned char)m[3]; i <<= 8;
-	i |= (unsigned char)m[2]; i <<= 8;
-	i |= (unsigned char)m[1]; i <<= 8;
-	i |= (unsigned char)m[0];
-	return *(double *)&i;
+
+/**
+ * list_add_tail - add a new entry
+ * @new: new entry to be added
+ * @head: list head to add it before
+ *
+ * Insert a new entry before the specified head.
+ * This is useful for implementing queues.
+ */
+static inline void list_add_tail(struct list_head *new, struct list_head *head) {
+	__list_add(new, head->prev, head);
 }
-*/
+
+/*
+ * Delete a list entry by making the prev/next entries
+ * point to each other.
+ *
+ * This is only for internal list manipulation where we know
+ * the prev/next entries already!
+ */
+static inline void __list_del(struct list_head * prev, struct list_head * next) {
+	next->prev = prev;
+	prev->next = next;
+}
+
+/**
+ * list_del - deletes entry from list.
+ * @entry: the element to delete from the list.
+ * Note: list_empty() on entry does not return true after this, the entry is
+ * in an undefined state.
+ */
+static inline void list_del(struct list_head *entry) {
+	__list_del(entry->prev, entry->next);
+}
+
+
+
 static inline void to_my_2(int value, char *m) {
 	m[1] = value >> 8;
 	m[0] = value;
@@ -86,10 +124,4 @@ static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
 		return 1;
 	}
 }
-
-static inline void strncpyz(char *d, char *s, int l) {
-	memcpy(d, s, l);
-	d[l] = '\0';
-}
-
 #endif

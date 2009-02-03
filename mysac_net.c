@@ -57,7 +57,7 @@ int mysac_socket_connect(char *socket_name, int *fd) {
 		conf_addr = path;
 		conf_port = strtol(&path[i+1], &error, 10);
 		if (*error != '\0')
-			return CR_WRONG_HOST_INFO;
+			return MYERR_BAD_PORT;
 	}
 
 	// si on ne trouve pas de separateur, ben c'est
@@ -95,7 +95,7 @@ int mysac_socket_connect(char *socket_name, int *fd) {
 	}
 
 	// adress format error
-	return CR_WRONG_HOST_INFO;
+	return MYERR_RESOLV_HOST;
 
 	end_of_building_address:
 
@@ -103,21 +103,21 @@ int mysac_socket_connect(char *socket_name, int *fd) {
 	if (conf_socket_type == AF_UNIX) {
 		listen_socket = socket(AF_UNIX, SOCK_STREAM, 0);
 		if (listen_socket < 0)
-			return CR_SOCKET_CREATE_ERROR;
+			return MYERR_SYSTEM;
 	}
 
 	// open socket for network protocol
 	else {
 		listen_socket = socket(conf_socket_type, SOCK_STREAM, IPPROTO_TCP);
 		if (listen_socket < 0)
-			return CR_SOCKET_CREATE_ERROR;
+			return MYERR_SYSTEM;
 	}
 
 	// set non block opt
 	ret_code = fcntl(listen_socket, F_SETFL, O_NONBLOCK);
 	if (ret_code < 0) {
 		close(listen_socket);
-		return CR_SOCKET_CREATE_ERROR;
+		return MYERR_SYSTEM;
 	}
 
 	// tcp no delay
@@ -126,7 +126,7 @@ int mysac_socket_connect(char *socket_name, int *fd) {
 		                      (char *)&one, sizeof(one));
 		if (ret_code < 0) {
 			close(listen_socket);
-			return CR_SOCKET_CREATE_ERROR;
+			return MYERR_SYSTEM;
 		}
 	}
 
@@ -136,7 +136,7 @@ int mysac_socket_connect(char *socket_name, int *fd) {
 		                      (char *)&one, sizeof(one));
 		if (ret_code < 0) {
 			close(listen_socket);
-			return CR_SOCKET_CREATE_ERROR;
+			return MYERR_SYSTEM;
 		}
 	}
 
@@ -163,7 +163,7 @@ int mysac_socket_connect(char *socket_name, int *fd) {
 		}
 		if (ret_code < 0 && errno != EINPROGRESS){
 			close(listen_socket);
-			return CR_CONN_HOST_ERROR;
+			return MYERR_SYSTEM;
 		}
 	}
 
@@ -179,10 +179,10 @@ int mysac_socket_connect_check(int fd) {
 
 	ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &code, &len);
 	if (ret != 0) {
-		return CR_SOCKET_CREATE_ERROR;
+		return MYERR_SYSTEM;
 	}
 	if (code != 0) {
-		return CR_CONN_HOST_ERROR;
+		return MYERR_CANT_CONNECT;
 	}
 	return 0;
 }
@@ -193,15 +193,15 @@ ssize_t mysac_read(int fd, void *buf, size_t count, int *err) {
 	len = read(fd, buf, count);
 
 	if (len == 0) {
-		*err = CR_SERVER_LOST;
+		*err = MYERR_SERVER_LOST;
 		return -1;
 	}
 	
 	if (len == -1) {
 		if (errno == EAGAIN)
-			*err = MYSAC_WANT_READ;
+			*err = MYERR_WANT_READ;
 		else
-			*err = CR_SERVER_LOST;
+			*err = MYERR_SERVER_LOST;
 		return -1;
 	}
 
@@ -216,9 +216,9 @@ ssize_t mysac_write(int fd, const void *buf, size_t len, int *err) {
 
 	if (ret == -1) {
 		if (errno == EAGAIN) 
-			*err = MYSAC_WANT_WRITE;
+			*err = MYERR_WANT_WRITE;
 		else
-			*err = CR_SERVER_LOST;
+			*err = MYERR_SERVER_LOST;
 		return -1;
 	}
 

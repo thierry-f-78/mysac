@@ -51,32 +51,19 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 
 	i = 0;
 
-	/* n (Length Coded String)   def */
+	/* n (Length Coded String)   catalog */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 	if (tmp_len == -1)
 		return -1;
 	i += tmp_len;
 	if (i + size > len)
 		return -1;
-	col->def_length = size;
-	memmove(wh, &buf[i], size);
-	col->def = wh;
-	col->def[size] = '\0';
-	wh += size + 1;
-	i += size;
-
-	/* n (Length Coded String)    catalog */
-	col->catalog_length = 0;
-	col->catalog = "";
-	/*
-	i += my_lcb(&buf[i], &size, &nul);
 	col->catalog_length = size;
 	memmove(wh, &buf[i], size);
 	col->catalog = wh;
 	col->catalog[size] = '\0';
 	wh += size + 1;
 	i += size;
-	*/
 
 	/* n (Length Coded String)    db */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
@@ -178,14 +165,26 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	/* filler */
 	i += 2;
 
-	/* default */
-	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
-	if (tmp_len == -1)
-		return -1;
-	i += tmp_len;
-	if (i + size > len)
-		return -1;
-	i += size;
+	/* default - a priori facultatif */
+	if (len-i > 0) {
+		tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+		if (tmp_len == -1)
+			return -1;
+		i += tmp_len;
+		if (i + size > len)
+			return -1;
+		col->def_length = size;
+		memmove(wh, &buf[i], size);
+		col->def = wh;
+		col->def[size] = '\0';
+		wh += size + 1;
+		i += size;
+	}
+	else {
+		col->def = NULL;
+		col->def_length = 0;
+	}
+		
 
 	/* set write pointer */
 	return wh - buf;

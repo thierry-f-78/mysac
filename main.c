@@ -100,7 +100,7 @@ const char big_query[] =
     "  sub.ACK          AS ACK,\n"
     "  sub.DOWNTIME     AS DOWNTIME,\n"
     "  sub.NOTIF        AS NOTIF,\n"
-	 "  CAST(NOW() AS DATE) AS __HAHA,\n"
+	 "  CAST(NOW() AS UNSIGNED) AS __HAHA,\n"
 	 "  CAST(sub.LASTCHECK AS DATETIME) AS __LASTCHECK,\n"
 	 "  CAST(sub.DURATION  AS DATETIME) AS __DURATION\n"
     "\n"
@@ -204,9 +204,11 @@ enum a {
 	QUERY,
 };
 
+#define BUFFERSIZE (1024*1024*2)
+
 void mysac_main(int fd, void *arg) {
 	struct my *my;
-	char buffer[1024*1024];
+	char buffer[BUFFERSIZE];
 	MYSAC *m;
 	MYSAC_ROW *r;
 	MYSAC_RES *res;
@@ -257,20 +259,21 @@ void mysac_main(int fd, void *arg) {
 		err = mysac_send_stmt_prepare(m, &my->stmt_id);
 		if (err != 0) break;
 
-		mysac_set_stmt_execute(m, my->stmt_id);
-		my->state = QUERY;
-
 	/**************************************************
 
 	  send query
 
 	**************************************************/
 	case_QUERY:
+		res = mysac_init_res(buffer, BUFFERSIZE);
+		mysac_set_stmt_execute(m, res, my->stmt_id);
+		if (err != 0) break;
+		my->state = QUERY;
+
 	case QUERY:
 		gettimeofday(&avant, NULL);
 
-		res = mysac_init_res(buffer, 1024*1024);
-		err = mysac_send_stmt_execute(m, res);
+		err = mysac_send_stmt_execute(m);
 		if (err != 0) break;
 
 #if 1
@@ -378,8 +381,6 @@ void mysac_main(int fd, void *arg) {
 		fprintf(stderr, "%d.%06d\n", display.tv_sec, display.tv_usec);
 
 		// err = mysac_set_query(m, big_query);
-		err = mysac_set_stmt_execute(m, my->stmt_id);;
-		if (err != 0) break;
 //		goto case_QUERY;
 
 		exit(0);
@@ -392,20 +393,20 @@ void mysac_main(int fd, void *arg) {
 	**************************************************/
 
 	/* want read */
-	if (err == MYSAC_WANT_READ) {
+	if (err == MYERR_WANT_READ) {
 		ev_poll_fd_clr(mysac_get_fd(m), EV_POLL_WRITE);
 		ev_poll_fd_set(mysac_get_fd(m), EV_POLL_READ, mysac_main, my);
 	}
 
 	/* want write */
-	else if (err == MYSAC_WANT_WRITE) {
+	else if (err == MYERR_WANT_WRITE) {
 		ev_poll_fd_clr(mysac_get_fd(m), EV_POLL_READ);
 		ev_poll_fd_set(mysac_get_fd(m), EV_POLL_WRITE, mysac_main, my);
 	}
 
 	/* error */
 	else if (err != 0) {
-		fprintf(stderr, "error(%d): %s %s\n", err, mysac_error(m), m->mysql_error);
+		fprintf(stderr, "mysql(%d): %s\n", err, mysac_advance_error(m));
 		exit (1);
 	}
 }

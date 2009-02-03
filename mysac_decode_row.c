@@ -8,7 +8,6 @@
 #include <mysql/my_global.h>
 
 #include "mysac.h"
-#include "list.h"
 #include "mysac_utils.h"
 
 
@@ -32,17 +31,22 @@ int mysac_decode_binary_row(char *buf, int packet_len, MYSAC_RES *res, MYSAC_ROW
 	uint32_t days;
 	char _null_ptr[16];
 	char *null_ptr;
-	char bit;
+	unsigned char bit;
 
 	wh = buf;
-	memcpy(_null_ptr, buf, 16);
 	null_ptr = _null_ptr;
 	bit = 4; /* first 2 bits are reserved */
 
+	/* first bit is unused */
+	i = 1;
+
 	/* skip null bits */
-	i = ( (res->nb_cols + 9) / 8 ) + 1;
-	if (i > packet_len)
+	tmp_len = ( (res->nb_cols + 9) / 8 );
+	if (i + tmp_len > packet_len)
 		return -1;
+
+	memcpy(_null_ptr, &buf[i], tmp_len);
+	i += tmp_len;
 
 	for (j = 0; j < res->nb_cols; j++) {
 
@@ -247,13 +251,7 @@ int mysac_decode_binary_row(char *buf, int packet_len, MYSAC_RES *res, MYSAC_ROW
 			null_ptr++;
 		}
 	}
-
-	/*
-	fprintf(stderr, "l=%d,  col=%d, i=%d size=%d buf=%p read=%p\n",
-	                res->nb_lines, res->nb_cols, i,
-	                buf_len, &mysac->buf, buf);
-	*/
-	return buf - wh;
+	return wh - buf;
 }
 
 /**************************************************

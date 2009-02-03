@@ -13,6 +13,9 @@
 #ifndef __MYSAC_H__
 #define __MYSAC_H__
 
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 #include <mysql/errmsg.h>
 #include <mysql/mysql.h>
 
@@ -113,9 +116,20 @@ enum my_query_st {
 enum {
 	MYERR_PROTOCOL_ERROR = 1,
 	MYERR_BUFFER_OVERSIZE,
+	MYERR_PACKET_CORRUPT,
+	MYERR_WANT_READ,
+	MYERR_WANT_WRITE,
+	MYERR_UNKNOWN_ERROR,
+	MYERR_MYSQL_ERROR,
+	MYERR_SERVER_LOST,
+	MYERR_BAD_PORT,
+	MYERR_RESOLV_HOST,
+	MYERR_SYSTEM,
+	MYERR_CANT_CONNECT
 };
 
 extern const char *mysac_type[];
+extern const char *mysac_errors[];
 
 /**
  * This is union containing all c type matching mysql types
@@ -209,9 +223,6 @@ typedef struct mysac {
 	int read_id;
 	MYSAC_RES *res;
 } MYSAC;
-
-#define MYSAC_WANT_READ 1
-#define MYSAC_WANT_WRITE 2
 
 /**
  * Allocates or initializes a MYSQL object suitable for mysql_real_connect().
@@ -331,33 +342,20 @@ int mysac_set_database(MYSAC *mysac, const char *database);
 int mysac_send_database(MYSAC *mysac);
 
 /**
- * send stmt execute command
- *
- * @param mysac Should be the address of an existing MYSQL structure.
- * @param res is valid res structur
- *
- * @return 
- */
-static inline
-int mysac_send_stmt_execute(MYSAC *mysac, MYSAC_RES *res) {
-	return mysac_send_query(mysac, res);
-}
-
-/**
- * Initialize query
+ * Prepare statement
  *
  * @param mysac Should be the address of an existing MYSAC structur.
  * @param fmt is the output format with the printf style
  *
  * @return 0: ok, -1 nok
  */
-int mysac_set_query(MYSAC *mysac, const char *fmt, ...);
+int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...);
 
 /**
  * Send sql query command
  * 
  * @param mysac Should be the address of an existing MYSAC structur.
- * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param stmt_id is pointer for storing the statement id
  *
  * @return
  *  0 => ok
@@ -365,7 +363,54 @@ int mysac_set_query(MYSAC *mysac, const char *fmt, ...);
  *  MYSAC_WANT_WRITE
  *  ...
  */
-int mysac_send_query(MYSAC *mysac, MYSAC_RES *res);
+int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id);
+
+/**
+ * Execute statement
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param stmt_id the statement id
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id);
+
+/**
+ * send stmt execute command
+ *
+ * @param mysac Should be the address of an existing MYSQL structure.
+ *
+ * @return 
+ */
+static inline
+int mysac_send_stmt_execute(MYSAC *mysac) {
+	return mysac_send_query(mysac);
+}
+
+/**
+ * Initialize query
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param fmt is the output format with the printf style
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...);
+
+/**
+ * Send sql query command
+ * 
+ * @param mysac Should be the address of an existing MYSAC structur.
+ *
+ * @return
+ *  0 => ok
+ *  MYSAC_WANT_READ
+ *  MYSAC_WANT_WRITE
+ *  ...
+ */
+int mysac_send_query(MYSAC *mysac);
 
 /**
  * After executing a statement with mysql_query() returns the number of rows
@@ -564,7 +609,26 @@ unsigned int mysac_errno(MYSAC *mysac) {
  */
 static inline 
 const char *mysac_error(MYSAC *mysac) {
-	return client_errors[mysac->errorcode - 2000];
+	return mysac_errors[mysac->errorcode];
+}
+
+/**
+ * For the connection specified by mysql, mysql_error() returns a null-
+ * terminated string containing the error message for the most recently invoked
+ * API function that failed. If a function didn't fail, the return value of
+ * mysql_error() may be the previous error or an empty string to indicate no
+ * error.
+ *
+ * @param mysac Should be the address of an existing MYSQL structure.
+ */
+static inline 
+const char *mysac_advance_error(MYSAC *mysac) {
+	if (mysac->errorcode == MYERR_MYSQL_ERROR)
+		return mysac->mysql_error;
+	else if (mysac->errorcode == MYERR_SYSTEM)
+		return strerror(errno);
+	else
+		return mysac_errors[mysac->errorcode];
 }
 
 /*
