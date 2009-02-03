@@ -987,6 +987,23 @@ int mysac_send_query(MYSAC *mysac) {
 
 		/* read data in string type */
 		else if (err == MYSAC_RET_DATA) {
+#if 0
+			for (i=0; i<mysac->packet_length; i+=20) {
+				int j;
+
+				for(j=i;j<i+20;j++)
+					fprintf(stderr, "%02x ", (unsigned char)mysac->read[j]);
+
+				for(j=i;j<i+20;j++)
+					if (isprint(mysac->read[j]))
+						fprintf(stderr, "%c", (unsigned char)mysac->read[j]);
+					else
+						fprintf(stderr, ".");
+
+				fprintf(stderr, "\n");
+			}
+			fprintf(stderr, "\n\n");
+#endif
 			len = mysac_decode_string_row(mysac->read, mysac->packet_length,
 			                              res, res->cr);
 			if (len == -1) {
