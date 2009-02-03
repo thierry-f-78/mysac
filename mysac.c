@@ -63,6 +63,11 @@ static int my_response(MYSAC *m) {
 
 	/* read length */
 	case 1:
+		/* check for avalaible size in buffer */
+		if (m->read_len < 4) {	
+			m->errorcode = CR_OUT_OF_MEMORY;
+			return MYSAC_RET_ERROR;
+		}
 		err = mysac_read(m->fd, m->read + m->len,
 		                 4 - m->len, &errcode);
 		if (err == -1) {
@@ -88,6 +93,11 @@ static int my_response(MYSAC *m) {
 
 	/* read data */
 	case 2:
+		/* check for avalaible size in buffer */
+		if (m->read_len < m->packet_length) {	
+			m->errorcode = CR_OUT_OF_MEMORY;
+			return MYSAC_RET_ERROR;
+		}	
 		err = mysac_read(m->fd, m->read + m->len,
 		                 m->packet_length - m->len, &errcode);
 		if (err == -1)
@@ -98,6 +108,7 @@ static int my_response(MYSAC *m) {
 			m->errorcode = MYSAC_WANT_READ;
 			return MYSAC_WANT_READ;
 		}
+		m->read_len -= m->packet_length;
 
 		/* re-init eof */
 		m->readst = 3;
@@ -233,6 +244,7 @@ int mysac_connect(MYSAC *mysac) {
 		mysac->len = 0;
 		mysac->readst = 0;
 		mysac->read = mysac->buf;
+		mysac->read_len = MYSAC_BUFFER_SIZE;
 
 	/***********************************************
 	 read greatings
@@ -376,6 +388,7 @@ int mysac_connect(MYSAC *mysac) {
 		mysac->qst = MYSAC_RECV_AUTH_1;
 		mysac->readst = 0;
 		mysac->read = mysac->buf;
+		mysac->read_len = MYSAC_BUFFER_SIZE;
 
 	/***********************************************
 	 read response 1
@@ -446,6 +459,8 @@ int mysac_connect(MYSAC *mysac) {
 
 		mysac->qst = MYSAC_RECV_AUTH_1;
 		mysac->readst = 0;
+		mysac->read = mysac->buf;
+		mysac->read_len = MYSAC_BUFFER_SIZE;
 		goto case_MYSAC_RECV_AUTH_1;
 		
 	}
@@ -735,7 +750,7 @@ int mysac_set_query(MYSAC *mysac, const char *fmt, ...) {
 	return 0;
 }
 
-int mysac_send_query(MYSAC *mysac) {
+int mysac_send_query(MYSAC *mysac, MYSAC_RES *res) {
 	int err;
 	int errcode;
 	int i, j;
@@ -743,6 +758,7 @@ int mysac_send_query(MYSAC *mysac) {
 	char nul;
 	int use_stmt_fmt;
 	char c;
+	int len;
 
 	switch (mysac->qst) {
 
@@ -763,7 +779,6 @@ int mysac_send_query(MYSAC *mysac) {
 			return MYSAC_WANT_WRITE;
 		mysac->qst = MYSAC_RECV_QUERY_COLNUM;
 		mysac->readst = 0;
-		mysac->read = mysac->buf;
 	
 	/**********************************************************
 	*
@@ -773,17 +788,18 @@ int mysac_send_query(MYSAC *mysac) {
 
 	/* prepare struct 
 
-	 +-------------------+---------------+-----------------+
-	 | struct mysac_resp | MYSQL_FIELD[] | char[]          |
-	 |                   | resp->nb_cols | all fields name |
-	 +-------------------+---------------+-----------------+
+	 +---------------+-----------------+
+	 | MYSQL_FIELD[] | char[]          |
+	 | resp->nb_cols | all fields name |
+	 +---------------+-----------------+
 
 	 */
-	mysac->res = (MYSAC_RES *)mysac->read;
-	mysac->res->nb_lines = 0;
-	mysac->res->cols = (MYSQL_FIELD *)(mysac->read + sizeof(MYSAC_RES));
-	INIT_LIST_HEAD(&mysac->res->data);
-	mysac->read += sizeof(MYSAC_RES);
+
+	res->nb_lines = 0;
+	res->cols = (MYSQL_FIELD *)(res->buffer + sizeof(MYSAC_RES));
+	INIT_LIST_HEAD(&res->data);
+	mysac->read = res->buffer;
+	mysac->read_len = res->buffer_len;
 
 	case MYSAC_RECV_QUERY_COLNUM:
 		err = my_response(mysac);
@@ -797,24 +813,31 @@ int mysac_send_query(MYSAC *mysac) {
 
 		/* protocol error */
 		else if (err != MYSAC_RET_DATA) {
-			/* TODO: pas la bonne erreur */
-			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
+			mysac->errorcode = MYERR_PROTOCOL_ERROR;
 			return mysac->errorcode;
 		}
 
 		/* get nb col TODO: pas sur que ce soit un byte */
-		mysac->res->nb_cols = mysac->read[0];
+		res->nb_cols = mysac->read[0];
 		mysac->read_id = 0;
 		mysac->qst = MYSAC_RECV_QUERY_COLDESC;
 	
+		/* prepare cols space */
+
+		/* check for avalaible size in buffer */
+		if (mysac->read_len < sizeof(MYSQL_FIELD) * res->nb_cols) {
+			mysac->errorcode = MYERR_BUFFER_OVERSIZE;
+			return mysac->errorcode;
+		}
+		res->cols = mysac->read;
+		mysac->read += sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
+		mysac->read_len -= sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
+
 	/**********************************************************
 	*
 	* receive column description
 	*
 	**********************************************************/
-
-	/* prepare cols space */
-	mysac->read += sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 
 	case_MYSAC_RECV_QUERY_COLDESC:
 	mysac->readst = 0;
@@ -832,15 +855,17 @@ int mysac_send_query(MYSAC *mysac) {
 
 		/* protocol error */
 		else if (err != MYSAC_RET_DATA) {
-			/* TODO: pas la bonne erreur */
-			mysac->errorcode = CR_SERVER_HANDSHAKE_ERR;
+			mysac->errorcode = MYERR_PROTOCOL_ERROR;
 			return mysac->errorcode;
 		}
 
-		mysac_decode_field(mysac, &mysac->res->cols[mysac->read_id]);
+		/* decode mysql packet with field desc, use packet buffer for storing
+		   mysql data (field name) */
+		len = mysac_decode_field(mysac->read, mysac->packet_length,
+		                         &res->cols[mysac->read_id]);
 
 		mysac->read_id++;
-		if (mysac->read_id < mysac->res->nb_cols)
+		if (mysac->read_id < res->nb_cols)
 			goto case_MYSAC_RECV_QUERY_COLDESC;
 		
 		mysac->readst = 0;
@@ -883,6 +908,15 @@ int mysac_send_query(MYSAC *mysac) {
 	   +-------------------+----------------+-----------------+----------------+
 	 */
 
+	/* check for avalaible size in buffer */
+	if (mysac->read_len < sizeof(MYSAC_ROWS) + ( mysac->res->nb_cols * (
+	                      sizeof(MYSAC_ROW) + sizeof(unsigned long) ) ) ) {
+		mysac->errorcode = CR_OUT_OF_MEMORY;
+		return mysac->errorcode;
+	}
+	mysac->read_len -= sizeof(MYSAC_ROWS) + ( mysac->res->nb_cols * (
+	                   sizeof(MYSAC_ROW) + sizeof(unsigned long) ) );
+
 	/* reserve space for MYSAC_ROWS and add it into chained list */
 	mysac->res->cr = (MYSAC_ROWS *)mysac->read;
 	list_add_tail(&mysac->res->cr->link, &mysac->res->data);
@@ -896,6 +930,8 @@ int mysac_send_query(MYSAC *mysac) {
 	mysac->res->cr->lengths = (unsigned long *)mysac->read;
 	mysac->read += sizeof(unsigned long) * mysac->res->nb_cols;
 
+fprintf(stderr, "++++++ %d\n", sizeof(MYSAC_ROWS) + ( mysac->res->nb_cols * (sizeof(MYSAC_ROW) + sizeof(unsigned long) ) ));
+
 	/* struct tm */
 	for (i=0; i<mysac->res->nb_cols; i++) {
 		switch(mysac->res->cols[i].type) {
@@ -904,8 +940,15 @@ int mysac_send_query(MYSAC *mysac) {
 		case MYSQL_TYPE_TIMESTAMP:
 		case MYSQL_TYPE_DATETIME:
 		case MYSQL_TYPE_DATE:
+			if (mysac->read_len < sizeof(struct tm)) {
+				mysac->errorcode = CR_OUT_OF_MEMORY;
+				return mysac->errorcode;
+			}
 			mysac->res->cr->data[i].tm = (struct tm *)mysac->read;
 			mysac->read += sizeof(struct tm);
+			mysac->read_len -= sizeof(struct tm);
+fprintf(stderr, "++++++ %d\n", sizeof(struct tm));
+
 		}
 	}
 
@@ -945,6 +988,7 @@ int mysac_send_query(MYSAC *mysac) {
 		}
 
 		/* next line */
+		mysac->res->nb_lines++;
 		goto case_MYSAC_RECV_QUERY_DATA;
 	}
 }

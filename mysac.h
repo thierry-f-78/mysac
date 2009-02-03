@@ -1,3 +1,15 @@
+/*
+ * Copyright (c) 2009 Thierry FOURNIER
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License.
+ *
+ */
+
+/** @file */ 
+
 #ifndef __MYSAC_H__
 #define __MYSAC_H__
 
@@ -7,21 +19,24 @@
 /* def imported from: linux-2.6.24/include/linux/stddef.h */
 #define offset_of(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
-/* def imported from: linux-2.6.24/include/linux/kernel.h */
 /**
  * container_of - cast a member of a structure out to the containing structure
- * @ptr: the pointer to the member.
- * @type:   the type of the container struct this is embedded in.
- * @member: the name of the member within the struct.
+ *
+ * def imported from: linux-2.6.24/include/linux/kernel.h 
+ *
+ * @param ptr    the pointer to the member.
+ * @param type   the type of the container struct this is embedded in.
+ * @param member the name of the member within the struct.
  *
  */
 #define container_of(ptr, type, member) ({ \
 	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
 	(type *)( (char *)__mptr - offset_of(type,member) );})
 
-/* def imported from: linux-2.6.24/include/linux/list.h */
-/*
+/**
  * Simple doubly linked list implementation.
+ *
+ * def imported from: linux-2.6.24/include/linux/list.h
  *
  * Some of the internal functions ("__xxx") are useful when
  * manipulating whole lists rather than single entries, as
@@ -35,18 +50,23 @@ struct list_head {
 
 /**
  * list_entry - get the struct for this entry
- * @ptr: the &struct list_head pointer.
- * @type:   the type of the struct this is embedded in.
- * @member: the name of the list_struct within the struct.
+ *
+ * def imported from: linux-2.6.24/include/linux/list.h
+ *
+ * @param ptr: the &struct list_head pointer.
+ * @param type:   the type of the struct this is embedded in.
+ * @param member: the name of the list_struct within the struct.
  */
 #define list_entry(ptr, type, member) \
 	container_of(ptr, type, member)
 
 /**
  * list_first_entry - get the first element from a list
- * @ptr: the list head to take the element from.
- * @type:   the type of the struct this is embedded in.
- * @member: the name of the list_struct within the struct.
+ *
+ * def imported from: linux-2.6.24/include/linux/list.h
+ * @param ptr    the list head to take the element from.
+ * @param type   the type of the struct this is embedded in.
+ * @param member the name of the list_struct within the struct.
  *
  * Note, that list is expected to be not empty.
  */
@@ -89,8 +109,17 @@ enum my_query_st {
 #define MYSAC_COL_MAX_LEN 50
 #define MYSAC_COL_MAX_NUN 100
 
+/* errors */
+enum {
+	MYERR_PROTOCOL_ERROR = 1,
+	MYERR_BUFFER_OVERSIZE,
+};
+
 extern const char *mysac_type[];
 
+/**
+ * This is union containing all c type matching mysql types
+ */
 typedef union {
 	signed char stiny;          /* MYSQL_TYPE_TINY      TINYINT */
 	unsigned char utiny;        /* MYSQL_TYPE_TINY      TINYINT */
@@ -111,13 +140,21 @@ typedef union {
 	char* blob;                 /* MYSQL_TYPE_BLOB      BLOB,BINARY,VARBINARY */
 } MYSAC_ROW;
 
+/**
+ * This is chained element. contain pointer to each elements of one row
+ */
 typedef struct mysac_rows {
 	struct list_head link;
 	unsigned long *lengths;
 	MYSAC_ROW *data;
 } MYSAC_ROWS;
 
+/**
+ * This contain the complete result of one request
+ */
 typedef struct mysac_res {
+	char *buffer;
+	int buffer_len;
 	int nb_cols;
 	int nb_lines;
 	int nb_time;
@@ -126,10 +163,14 @@ typedef struct mysac_res {
 	MYSAC_ROWS *cr;	
 } MYSAC_RES;
 
+/**
+ * This contain the necessary for one mysql connection
+ */
 typedef struct mysac {
 	char buf[MYSAC_BUFFER_SIZE];
 	int len;
 	char *read;
+	int read_len;
 	char *send;
 	int readst;
 
@@ -178,6 +219,8 @@ typedef struct mysac {
  * returns a new object. Otherwise, the object is initialized and the address
  * of the object is returned. If mysql_init() allocates a new object, it is
  * freed when mysql_close() is called to close the connection.
+ *
+ * @param mysac Should be the address of an existing MYSAC structure.
  *
  * @return An initialized MYSAC* handle. NULL if there was insufficient memory
  *         to allocate a new object.
@@ -254,6 +297,11 @@ int mysac_connect(MYSAC *mysac);
 void mysac_close(MYSAC *mysac);
 
 /**
+ * This function return the mysql filedescriptor used for connection
+ * to the mysql server
+ *
+ * @param mysac Should be the address of an existing MYSAC structure.
+ *
  * @return mysql filedescriptor
  */
 static inline
@@ -261,27 +309,17 @@ int mysac_get_fd(MYSAC *mysac) {
 	return mysac->fd;
 }
 
-int mysac_set_database(MYSAC *mysac, const char *database);
-int mysac_send_database(MYSAC *mysac);
-
-
-static inline
-int mysac_send_stmt_execute(MYSAC *mysac) {
-	return mysac_send_query(mysac);
-}
-
 /**
- * Initialize query
+ * Build use database message
  *
  * @param mysac Should be the address of an existing MYSQL structure.
- *
- * @return 0: ok, -1 nok
+ * @param database is the database name
  */
-int mysac_set_query(MYSAC *mysac, const char *fmt, ...);
+int mysac_set_database(MYSAC *mysac, const char *database);
 
 /**
- * Send sql query command
- * 
+ * This send use database command
+ *
  * @param mysac Should be the address of an existing MYSQL structure.
  *
  * @return
@@ -290,7 +328,44 @@ int mysac_set_query(MYSAC *mysac, const char *fmt, ...);
  *  MYSAC_WANT_WRITE
  *  ...
  */
-int mysac_send_query(MYSAC *mysac);
+int mysac_send_database(MYSAC *mysac);
+
+/**
+ * send stmt execute command
+ *
+ * @param mysac Should be the address of an existing MYSQL structure.
+ * @param res is valid res structur
+ *
+ * @return 
+ */
+static inline
+int mysac_send_stmt_execute(MYSAC *mysac, MYSAC_RES *res) {
+	return mysac_send_query(mysac, res);
+}
+
+/**
+ * Initialize query
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param fmt is the output format with the printf style
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_set_query(MYSAC *mysac, const char *fmt, ...);
+
+/**
+ * Send sql query command
+ * 
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ *
+ * @return
+ *  0 => ok
+ *  MYSAC_WANT_READ
+ *  MYSAC_WANT_WRITE
+ *  ...
+ */
+int mysac_send_query(MYSAC *mysac, MYSAC_RES *res);
 
 /**
  * After executing a statement with mysql_query() returns the number of rows
@@ -312,9 +387,41 @@ int mysac_send_query(MYSAC *mysac);
 int mysac_affected_rows(MYSAC *mysac);
 
 /**
+ * Initialize MYSAC_RES structur
+ * This function can not allocate memory, just use your buffer.
+ *
+ * @param buffer this buffer must contain all the sql response.
+ *        this size is:
+ *        sizeof(MYSAC_RES) +
+ *        ( sizeof(MYSQL_FIELD) * nb_field ) + 
+ *        ( different fields names )
+ *
+ *        and for each row:
+ *        sizeof(MYSAC_ROWS) +
+ *        ( sizeof(MYSAC_ROW) * nb_field ) +
+ *        ( sizeof(unsigned long) * nb_field ) +
+ *        ( sizeof(struct tm) for differents date fields of the request ) +
+ *        ( differents strings returned by the request ) +
+ *
+ * @param len is the len of the buffer
+ *
+ * @return MYSAC_RES. this function cannot be fail
+ */
+static inline
+MYSAC_RES *mysac_init_res(char *buffer, int len) {
+	MYSAC_RES *res;
+
+	res = (MYSAC_RES *)buffer;
+	res->buffer = buffer + sizeof(MYSAC_RES);
+	res->buffer_len = len - sizeof(MYSAC_RES);
+
+	return res;
+}
+
+/**
  * Returns the number of columns for the most recent query on the connection.
  *
- * @param mysac Should be the address of an existing MYSQL structure.
+ * @param res Should be the address of an existing MYSAC_RES structure.
  *
  * @return number of columns
  */
@@ -330,7 +437,7 @@ unsigned int mysac_field_count(MYSAC_RES *res) {
  * set, such as SELECT. For statements such as INSERT, UPDATE, or DELETE, the
  * number of affected rows can be obtained with mysql_affected_rows().
  *
- * @param mysac Should be the address of an existing MYSQL structure.
+ * @param res Should be the address of an existing MYSAC_RES structure.
  *
  * @return The number of rows in the result set. 
  */
@@ -351,7 +458,7 @@ unsigned long mysac_num_rows(MYSAC_RES *res) {
  * value. If the pointer is NULL, the field is NULL; otherwise, the field is
  * empty.
  *
- * @param mysac Should be the address of an existing MYSQL structure.
+ * @param res Should be the address of an existing MYSAC_RES structure.
  * 
  * @return A MYSAC_ROW structure for the next row. NULL if there are no more
  * rows to retrieve or if an error occurred. 
@@ -419,7 +526,7 @@ mysql_fetch_lengths() /*Returns the lengths of all columns in the current row*/
  *                               database.
  *    ER_WRONG_DB_NAME         : The database name was too long.
  */
-int mysac_change_user(MYSAC *mysac, const char *user, const char *password,
+int mysac_change_user(MYSAC *mysac, const char *user, const char *passwd,
                       const char *db);
 
 /**
@@ -457,7 +564,7 @@ unsigned int mysac_errno(MYSAC *mysac) {
  */
 static inline 
 const char *mysac_error(MYSAC *mysac) {
-	return client_errors[mysac->errorcode];
+	return client_errors[mysac->errorcode - 2000];
 }
 
 /*

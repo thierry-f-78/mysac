@@ -9,12 +9,12 @@
 #include "mysac_utils.h"
 #include "mysac.h"
 
-void mysac_decode_field(MYSAC *mysac, MYSQL_FIELD *col) {
+int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	int i;
-	int len;
 	unsigned long size;
 	char nul;
 	char *wh;
+	int tmp_len;
 
 	/*
 	VERSION 4.0
@@ -47,14 +47,19 @@ void mysac_decode_field(MYSAC *mysac, MYSQL_FIELD *col) {
 	 n (Length Coded Binary)    default
 	*/
 
-	wh = mysac->read;
+	wh = buf;
 
 	i = 0;
 
 	/* n (Length Coded String)   def */
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+	if (tmp_len == -1)
+		return -1;
+	i += tmp_len;
+	if (i + size > len)
+		return -1;
 	col->def_length = size;
-	memmove(wh, &mysac->read[i], size);
+	memmove(wh, &buf[i], size);
 	col->def = wh;
 	col->def[size] = '\0';
 	wh += size + 1;
@@ -64,9 +69,9 @@ void mysac_decode_field(MYSAC *mysac, MYSQL_FIELD *col) {
 	col->catalog_length = 0;
 	col->catalog = "";
 	/*
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	i += my_lcb(&buf[i], &size, &nul);
 	col->catalog_length = size;
-	memmove(wh, &mysac->read[i], size);
+	memmove(wh, &buf[i], size);
 	col->catalog = wh;
 	col->catalog[size] = '\0';
 	wh += size + 1;
@@ -74,80 +79,114 @@ void mysac_decode_field(MYSAC *mysac, MYSQL_FIELD *col) {
 	*/
 
 	/* n (Length Coded String)    db */
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+	if (tmp_len == -1)
+		return -1;
+	i += tmp_len;
+	if (i + size > len)
+		return -1;
 	col->db_length = size;
-	memmove(wh, &mysac->read[i], size);
+	memmove(wh, &buf[i], size);
 	col->db = wh;
 	col->db[size] = '\0';
 	wh += size + 1;
 	i += size;
 
 	/* n (Length Coded String)    table */
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+	if (tmp_len == -1)
+		return -1;
+	i += tmp_len;
+	if (i + size > len)
+		return -1;
 	col->table_length = size;
-	memmove(wh, &mysac->read[i], size);
+	memmove(wh, &buf[i], size);
 	col->table = wh;
 	col->table[size] = '\0';
 	wh += size + 1;
 	i += size;
 
 	/* n (Length Coded String)    org_table */
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+	if (tmp_len == -1)
+		return -1;
+	i += tmp_len;
+	if (i + size > len)
+		return -1;
 	col->org_table_length = size;
-	memmove(wh, &mysac->read[i], size);
+	memmove(wh, &buf[i], size);
 	col->org_table = wh;
 	col->org_table[size] = '\0';
 	wh += size + 1;
 	i += size;
 
 	/* n (Length Coded String)    name */
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+	if (tmp_len == -1)
+		return -1;
+	i += tmp_len;
+	if (i + size > len)
+		return -1;
 	col->name_length = size;
-	memmove(wh, &mysac->read[i], size);
+	memmove(wh, &buf[i], size);
 	col->name = wh;
 	col->name[size] = '\0';
 	wh += size + 1;
 	i += size;
 
 	/* n (Length Coded String)    org_name */
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+	if (tmp_len == -1)
+		return -1;
+	i += tmp_len;
+	if (i + size > len)
+		return -1;
 	col->org_name_length = size;
-	memmove(wh, &mysac->read[i], size);
+	memmove(wh, &buf[i], size);
 	col->org_name = wh;
 	col->org_name[size] = '\0';
 	wh += size + 1;
 	i += size;
 
+	/* check len */
+	if (i + 13 > len)
+		return -1;
+
 	/* (filler) */
 	i += 1;
 
 	/* charset */
-	col->charsetnr = uint2korr(&mysac->read[i]);
+	col->charsetnr = uint2korr(&buf[i]);
 	i += 2;
 
 	/* length */
-	col->length = uint4korr(&mysac->read[i]);
+	col->length = uint4korr(&buf[i]);
 	i += 4;
 
 	/* type */
-	col->type = (unsigned char)mysac->read[i];
+	col->type = (unsigned char)buf[i];
 	i += 1;
 
 	/* flags */
-	col->flags = uint3korr(&mysac->read[i]);
+	col->flags = uint3korr(&buf[i]);
 	i += 2;
 
 	/* decimals */
-	col->decimals = mysac->read[i];
+	col->decimals = buf[i];
 	i += 1;
 
 	/* filler */
 	i += 2;
 
 	/* default */
-	i += my_lcb(&mysac->read[i], &size, &nul);
+	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
+	if (tmp_len == -1)
+		return -1;
+	i += tmp_len;
+	if (i + size > len)
+		return -1;
 	i += size;
 
 	/* set write pointer */
-	mysac->read = wh;
+	return wh - buf;
 }

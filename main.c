@@ -82,7 +82,7 @@ const char *my_flags[] = {
 char *database;
 
 const char big_query[] =
-    //"SELECT COUNT(*) FROM (\n"
+//    "SELECT COUNT(*) FROM (\n"
     "SELECT\n"
     "  GROUP_CONCAT(\n"
     "    DISTINCT sub.GROUPES\n"
@@ -99,7 +99,10 @@ const char big_query[] =
     "  sub.TYPE         AS TYPE,\n"
     "  sub.ACK          AS ACK,\n"
     "  sub.DOWNTIME     AS DOWNTIME,\n"
-    "  sub.NOTIF        AS NOTIF\n"
+    "  sub.NOTIF        AS NOTIF,\n"
+	 "  CAST(NOW() AS DATE) AS __HAHA,\n"
+	 "  CAST(sub.LASTCHECK AS DATETIME) AS __LASTCHECK,\n"
+	 "  CAST(sub.DURATION  AS DATETIME) AS __DURATION\n"
     "\n"
     "FROM (\n"
     "\n"
@@ -190,7 +193,7 @@ const char big_query[] =
     "\n"
     "ORDER BY GROUPES, MACHINES, SERVICES\n"
 	 //"LIMIT 0,30\n"
-    //") AS sub2\n"
+//    ") AS sub2\n"
 	 ;
 const char *query;
 
@@ -203,8 +206,10 @@ enum a {
 
 void mysac_main(int fd, void *arg) {
 	struct my *my;
+	char buffer[1024*1024];
 	MYSAC *m;
 	MYSAC_ROW *r;
+	MYSAC_RES *res;
 	int err, j, i;
 	struct timeval avant;
 	struct timeval apres;
@@ -264,12 +269,13 @@ void mysac_main(int fd, void *arg) {
 	case QUERY:
 		gettimeofday(&avant, NULL);
 
-		err = mysac_send_stmt_execute(m);
+		res = mysac_init_res(buffer, 1024*1024);
+		err = mysac_send_stmt_execute(m, res);
 		if (err != 0) break;
 
 #if 1
 		fprintf(stderr, "request return ok\n");
-		fprintf(stderr, "%d lines\n", mysac_num_rows(m->res));
+		fprintf(stderr, "%d lines\n", mysac_num_rows(res));
 
 		i = 0;
 		while (1) {	
@@ -278,13 +284,13 @@ void mysac_main(int fd, void *arg) {
 			MYSQL_FIELD *mf;
 	
 			/* get line */
-			r = mysac_fetch_row(m->res);
+			r = mysac_fetch_row(res);
 			if (r == NULL)
 				break;
 
 			/* display line */
 			fprintf(stderr, "%d: ", i);
-			for (j=0; j<mysac_field_count(m->res); j++) {
+			for (j=0; j<mysac_field_count(res); j++) {
 
 				mf = &m->res->cols[j];
 				fprintf(stderr, "%s\t%s\t", mf->name, mysac_type[mf->type]);
@@ -414,8 +420,8 @@ int main(int argc, char *argv[]) {
 
 	else
 //		query = "CALL search()";
-//		query = big_query;
-		query = "SELECT * FROM toto"; /* retourne tous les types */
+		query = big_query;
+//		query = "SELECT * FROM toto"; /* retourne tous les types */
 //		query = "SELECT TIMEDIFF(NOW(), test.ze_date) AS DIFF FROM test";
 //		query = "SELECT COUNT(*) AS COUNT FROM test;";
 
@@ -433,8 +439,8 @@ int main(int argc, char *argv[]) {
 	//mysac_setup(m, "127.0.0.1:3306", "root", "root", "nagios", 0);
 	mysac_setup(m, "127.0.0.1:3306", "root", "root", NULL, 0);
 
-	// database = "nagios";
-	database = "tests";
+	database = "nagios";
+	// database = "tests";
 	mysac_connect(m);
 
 	/* call connect */

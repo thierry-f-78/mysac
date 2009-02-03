@@ -8,3 +8,7 @@ main: main.o $(OBJS)
 
 clean:
 	rm -f main main.o $(OBJS)
+
+doc:
+	doxygen mysac.doxygen
+

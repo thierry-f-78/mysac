@@ -49,13 +49,41 @@ static inline void to_my_4(int value, char *m) {
   253          3           = value of following 24-bit word
   254          8           = value of following 64-bit word
 */
-static inline int my_lcb(char *m, unsigned long *r,  char *nul) {
+static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
+	if (len < 1)
+		return -1;
 	switch ((unsigned char)m[0]) {
-	case 251: *r = 0;                   *nul=1; return 1;
-	case 252: *r = uint2korr(&m[1]);    *nul=0; return 3;
-	case 253: *r = uint4korr(&m[1]);    *nul=0; return 5;
-	case 254: *r = uint8korr(&m[1]);    *nul=0; return 9;
-	default:  *r = (unsigned char)m[0]; *nul=0; return 1;
+
+	case 251:
+		*r = 0;
+		*nul=1;
+		return 1;
+
+	case 252:
+		if (len < 3)
+			return -1;
+		*r = uint2korr(&m[1]);
+		*nul=0;
+		return 3;
+
+	case 253:
+		if (len < 5)
+			return -1;
+		*r = uint4korr(&m[1]);
+		*nul=0;
+		return 5;
+
+	case 254:
+		if (len < 9)
+			return -1;
+		*r = uint8korr(&m[1]);
+		*nul=0;
+		return 9;
+
+	default:
+		*r = (unsigned char)m[0];
+		*nul=0;
+		return 1;
 	}
 }
 
