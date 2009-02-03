@@ -7,7 +7,6 @@
 #include <mysql/mysql.h>
 #include <mysql/my_global.h>
 
-#include "mysac_decode_paquet.h"
 #include "mysac.h"
 #include "list.h"
 #include "mysac_utils.h"
@@ -21,12 +20,13 @@
    read data in binary type 
 
 **************************************************/ 
-void mysac_decode_binary_row(MYSAC *mysac) {
+int mysac_decode_binary_row(char *buf, int packet_len, MYSAC_RES *res, MYSAC_ROWS *row) {
 	int j;
 	int i;
 	char nul;
 	int year, month, day, hour, minut, second;
 	unsigned long len;
+	int tmp_len;
 	unsigned char *packet;
 	char *wh;
 	uint32_t days;
@@ -34,15 +34,17 @@ void mysac_decode_binary_row(MYSAC *mysac) {
 	char *null_ptr;
 	char bit;
 
-	wh = mysac->read;
-	memcpy(_null_ptr, mysac->read, 16);
+	wh = buf;
+	memcpy(_null_ptr, buf, 16);
 	null_ptr = _null_ptr;
 	bit = 4; /* first 2 bits are reserved */
 
 	/* skip null bits */
-	i = ( (mysac->res->nb_cols + 9) / 8 ) + 1;
+	i = ( (res->nb_cols + 9) / 8 ) + 1;
+	if (i > packet_len)
+		return -1;
 
-	for (j = 0; j < mysac->res->nb_cols; j++) {
+	for (j = 0; j < res->nb_cols; j++) {
 
 		/*
 		   We should set both row_ptr and is_null to be able to see
@@ -56,11 +58,11 @@ void mysac_decode_binary_row(MYSAC *mysac) {
 		}
 
 		else {
-			switch (mysac->res->cols[j].type) {
+			switch (res->cols[j].type) {
 	
 			/* read null */
 			case MYSQL_TYPE_NULL:
-				mysac->res->cr->data[j].blob = NULL;
+				row->data[j].blob = NULL;
 	
 			/* read blob */
 			case MYSQL_TYPE_TINY_BLOB:
@@ -78,83 +80,102 @@ void mysac_decode_binary_row(MYSAC *mysac) {
 			case MYSQL_TYPE_VARCHAR:
 			/* read date */
 			case MYSQL_TYPE_NEWDATE:
-				i += my_lcb(&mysac->read[i], &len,  &nul);
+				tmp_len = my_lcb(&buf[i], &len, &nul, packet_len-i);
+				if (tmp_len == -1)
+					return -1;
+				i += tmp_len;
+				if (i + len > packet_len)
+					return -1;
 				if (nul == 1)
-					mysac->res->cr->data[j].blob = NULL;
+					row->data[j].blob = NULL;
 				else {
-					memmove(wh, &mysac->read[i], len);
-					mysac->res->cr->data[j].blob = wh;
-					mysac->res->cr->data[j].blob[len] = '\0';
+					memmove(wh, &buf[i], len);
+					row->data[j].blob = wh;
+					row->data[j].blob[len] = '\0';
 					i += len;
 					wh += len + 1;
 				}
-				mysac->res->cr->lengths[j] = len;
+				row->lengths[j] = len;
 				break;
 	
 			case MYSQL_TYPE_TINY:
-				mysac->res->cr->data[j].stiny = mysac->read[i];
+				if (i > packet_len - 1)
+					return -1;
+				row->data[j].stiny = buf[i];
 				i++;
 				break;
 	
 			case MYSQL_TYPE_SHORT:
-				mysac->res->cr->data[j].ssmall = sint2korr(&mysac->read[i]);
+				if (i > packet_len - 2)
+					return -1;
+				row->data[j].ssmall = sint2korr(&buf[i]);
 				i += 2;
 				break;
 	
 			case MYSQL_TYPE_INT24:
 			case MYSQL_TYPE_LONG:
-				mysac->res->cr->data[j].sint = sint4korr(&mysac->read[i]);
+				if (i > packet_len - 4)
+					return -1;
+				row->data[j].sint = sint4korr(&buf[i]);
 				i += 4;
 				break;
 	
 			case MYSQL_TYPE_LONGLONG:
-				mysac->res->cr->data[j].sbigint = sint8korr(&mysac->read[i]);
+				if (i > packet_len - 8)
+					return -1;
+				row->data[j].sbigint = sint8korr(&buf[i]);
 				i += 8;
 				break;
 	
 			case MYSQL_TYPE_FLOAT:
-				float4get(mysac->res->cr->data[j].mfloat, &mysac->read[i]);
+				if (i > packet_len - 4)
+					return -1;
+				float4get(row->data[j].mfloat, &buf[i]);
 				i += 4;
 				break;
 	
 			case MYSQL_TYPE_DOUBLE:
-				float8get(mysac->res->cr->data[j].mdouble, &mysac->read[i]);
+				if (i > packet_len - 8)
+					return -1;
+				float8get(row->data[j].mdouble, &buf[i]);
 				i += 8;
 				break;
 	
 			/* libmysql/libmysql.c:3370
 			 * static void read_binary_time(MYSQL_TIME *tm, uchar **pos) */
 			case MYSQL_TYPE_TIME:
-				packet = &mysac->read[i];
-				len = net_field_length(&packet);
-				i += (int) ( (char *)packet - (char *)&mysac->read[i] );
+				tmp_len = my_lcb(&buf[i], &len, &nul, packet_len-i);
+				if (tmp_len == -1)
+					return -1;
+				i += tmp_len;
+				if (i + len > packet_len)
+					return -1;
+				if (nul == 1)
+					row->data[j].blob = NULL;
 	
 				if (len > 0) {
-					mysac->res->cr->data[j].tv.tv_sec = 
-					              ( uint4korr(&mysac->read[i+1]) * 86400 ) +
-					              ( mysac->read[i+5] * 3600 ) +
-					              ( mysac->read[i+6] * 60 ) +
-					                mysac->read[i+7];
-					if (mysac->read[i] != 0)
-						mysac->res->cr->data[j].tv.tv_sec = 
-						                          - mysac->res->cr->data[j].tv.tv_sec;
+					row->data[j].tv.tv_sec = 
+					              ( uint4korr(&buf[i+1]) * 86400 ) +
+					              ( buf[i+5] * 3600 ) +
+					              ( buf[i+6] * 60 ) +
+					                buf[i+7];
+					if (buf[i] != 0)
+						row->data[j].tv.tv_sec = - row->data[j].tv.tv_sec;
 					if (len > 8)
-						mysac->res->cr->data[j].tv.tv_usec =
-						                                 uint4korr(&mysac->read[i+8]);
+						row->data[j].tv.tv_usec = uint4korr(&buf[i+8]);
 					else
-						mysac->res->cr->data[j].tv.tv_usec = 0;
+						row->data[j].tv.tv_usec = 0;
 				}
 				i += len;
 				break;
 	
 			case MYSQL_TYPE_YEAR:
-				mysac->res->cr->data[j].tm->tm_year =
-				                                  uint2korr(&mysac->read[i]) - 1900;
-				mysac->res->cr->data[j].tm->tm_mon  = 0;
-				mysac->res->cr->data[j].tm->tm_mday = 1;
-				mysac->res->cr->data[j].tm->tm_hour = 0;
-				mysac->res->cr->data[j].tm->tm_min  = 0;
-				mysac->res->cr->data[j].tm->tm_sec  = 0;
+				row->data[j].tm->tm_year = uint2korr(&buf[i]) - 1900;
+				row->data[j].tm->tm_mon  = 0;
+				row->data[j].tm->tm_mday = 1;
+				row->data[j].tm->tm_hour = 0;
+				row->data[j].tm->tm_min  = 0;
+				row->data[j].tm->tm_sec  = 0;
 				i += 2;
 				break;
 	
@@ -162,22 +183,26 @@ void mysac_decode_binary_row(MYSAC *mysac) {
 			 * static void read_binary_datetime(MYSQL_TIME *tm, uchar **pos) */
 			case MYSQL_TYPE_TIMESTAMP:
 			case MYSQL_TYPE_DATETIME:
-				packet = &mysac->read[i];
-				len = net_field_length(&packet);
-				i += (int) ( (char *)packet - (char *)&mysac->read[i] );
+				tmp_len = my_lcb(&buf[i], &len, &nul, packet_len-i);
+				if (tmp_len == -1)
+					return -1;
+				i += tmp_len;
+				if (i + len > packet_len)
+					return -1;
+				if (nul == 1)
+					row->data[j].blob = NULL;
 	
-				mysac->res->cr->data[j].tm->tm_year = 
-				                                uint2korr(&mysac->read[i+0]) - 1900;
-				mysac->res->cr->data[j].tm->tm_mon  = mysac->read[i+2] - 1;
-				mysac->res->cr->data[j].tm->tm_mday = mysac->read[i+3];
+				row->data[j].tm->tm_year = uint2korr(&buf[i+0]) - 1900;
+				row->data[j].tm->tm_mon  = buf[i+2] - 1;
+				row->data[j].tm->tm_mday = buf[i+3];
 				if (len > 4) {
-					mysac->res->cr->data[j].tm->tm_hour = mysac->read[i+4];
-					mysac->res->cr->data[j].tm->tm_min  = mysac->read[i+5];
-					mysac->res->cr->data[j].tm->tm_sec  = mysac->read[i+6];
+					row->data[j].tm->tm_hour = buf[i+4];
+					row->data[j].tm->tm_min  = buf[i+5];
+					row->data[j].tm->tm_sec  = buf[i+6];
 				} else {
-					mysac->res->cr->data[j].tm->tm_hour = 0;
-					mysac->res->cr->data[j].tm->tm_min  = 0;
-					mysac->res->cr->data[j].tm->tm_sec  = 0;
+					row->data[j].tm->tm_hour = 0;
+					row->data[j].tm->tm_min  = 0;
+					row->data[j].tm->tm_sec  = 0;
 				}
 				if (len > 7) {
 					/* les microsecondes ... */
@@ -188,17 +213,21 @@ void mysac_decode_binary_row(MYSAC *mysac) {
 			/* libmysql/libmysql.c:3430
 			 * static void read_binary_date(MYSQL_TIME *tm, uchar **pos) */
 			case MYSQL_TYPE_DATE:
-				packet = &mysac->read[i];
-				len = net_field_length(&packet);
-				i += (int) ( (char *)packet - (char *)&mysac->read[i] );
+				tmp_len = my_lcb(&buf[i], &len, &nul, packet_len-i);
+				if (tmp_len == -1)
+					return -1;
+				i += tmp_len;
+				if (i + len > packet_len)
+					return -1;
+				if (nul == 1)
+					row->data[j].blob = NULL;
 	
-				mysac->res->cr->data[j].tm->tm_year =
-				                                uint2korr(&mysac->read[i+0]) - 1900;
-				mysac->res->cr->data[j].tm->tm_mon  = mysac->read[i+2] - 1;
-				mysac->res->cr->data[j].tm->tm_mday = mysac->read[i+3];
-				mysac->res->cr->data[j].tm->tm_hour = 0;
-				mysac->res->cr->data[j].tm->tm_min  = 0;
-				mysac->res->cr->data[j].tm->tm_sec  = 0;
+				row->data[j].tm->tm_year = uint2korr(&buf[i+0]) - 1900;
+				row->data[j].tm->tm_mon  = buf[i+2] - 1;
+				row->data[j].tm->tm_mday = buf[i+3];
+				row->data[j].tm->tm_hour = 0;
+				row->data[j].tm->tm_min  = 0;
+				row->data[j].tm->tm_sec  = 0;
 				i += len;
 				break;
 	
@@ -219,11 +248,12 @@ void mysac_decode_binary_row(MYSAC *mysac) {
 		}
 	}
 
-	mysac->read_len += &mysac->read[i] - wh;
-	mysac->read = wh;
+	/*
 	fprintf(stderr, "l=%d,  col=%d, i=%d size=%d buf=%p read=%p\n",
-	                mysac->res->nb_lines, mysac->res->nb_cols, i,
-	                mysac->read_len, &mysac->buf, mysac->read);
+	                res->nb_lines, res->nb_cols, i,
+	                buf_len, &mysac->buf, buf);
+	*/
+	return buf - wh;
 }
 
 /**************************************************
@@ -231,12 +261,12 @@ void mysac_decode_binary_row(MYSAC *mysac) {
    read data in string type 
 
 **************************************************/ 
-int mysac_decode_string_row(MYSAC *mysac) {
+int mysac_decode_string_row(char *buf, int len, MYSAC_RES *res, MYSAC_ROWS *row) {
 
 #if 0
 	for (j = 0; j < mysac->nb_cols; j++) {
 
-		i += my_lcb(&mysac->read[i], &mysac->cr->lengths[j],  &nul);
+		i += my_lcb(&buf[i], &mysac->cr->lengths[j],  &nul);
 
 		if (nul == 1)
 			mysac->cr->data[j] = NULL;
@@ -245,14 +275,14 @@ int mysac_decode_string_row(MYSAC *mysac) {
 			switch (mysac->cols[j].mf.type) {
 			case MYSQL_TYPE_SHORT:
 			case MYSQL_TYPE_LONG:
-				c = mysac->read[i + mysac->cr->lengths[j]];
-				mysac->read[i + mysac->cr->lengths[j]] = '\0';
-				mysac->cr->data[j] = (char *)atoi(&mysac->read[i]);
-				mysac->read[i + mysac->cr->lengths[j]] = c;
+				c = buf[i + mysac->cr->lengths[j]];
+				buf[i + mysac->cr->lengths[j]] = '\0';
+				mysac->cr->data[j] = (char *)atoi(&buf[i]);
+				buf[i + mysac->cr->lengths[j]] = c;
 				break;
 
 			default:
-				mysac->cr->data[j] = &mysac->read[i];
+				mysac->cr->data[j] = &buf[i];
 				i += mysac->cr->lengths[j];
 				break;
 			}
@@ -274,7 +304,7 @@ int mysac_decode_string_row(MYSAC *mysac) {
 }
 	
 /* next line */
-mysac->read += i + 1;
+buf += i + 1;
 goto case_MYSAC_RECV_QUERY_DATA;
 	}
 	#endif

@@ -6,7 +6,7 @@
 #include <mysql/mysql.h>
 #include <mysql/my_global.h>
 
-#include "mysac_decode_paquet.h"
+#include "mysac_decode_field.h"
 #include "mysac_decode_row.h"
 #include "mysac.h"
 #include "list.h"
@@ -829,7 +829,7 @@ int mysac_send_query(MYSAC *mysac, MYSAC_RES *res) {
 			mysac->errorcode = MYERR_BUFFER_OVERSIZE;
 			return mysac->errorcode;
 		}
-		res->cols = mysac->read;
+		res->cols = (MYSQL_FIELD *)mysac->read;
 		mysac->read += sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 		mysac->read_len -= sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 
@@ -974,11 +974,13 @@ fprintf(stderr, "++++++ %d\n", sizeof(struct tm));
 
 		/* read data in string type */
 		else if (err == MYSAC_RET_DATA)
-			mysac_decode_string_row(mysac);
+			mysac_decode_string_row(mysac->read, mysac->packet_length,
+			                        res, res->cr);
 
 		/* read data in binary type */
 		else if (err == MYSAC_RET_OK)
-			mysac_decode_binary_row(mysac);
+			mysac_decode_binary_row(mysac->read, mysac->packet_length,
+			                        res, res->cr);
 
 		/* protocol error */
 		else {

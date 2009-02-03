@@ -160,7 +160,7 @@ typedef struct mysac_res {
 	int nb_time;
 	MYSQL_FIELD *cols;
 	struct list_head data;
-	MYSAC_ROWS *cr;	
+	MYSAC_ROWS *cr;
 } MYSAC_RES;
 
 /**
