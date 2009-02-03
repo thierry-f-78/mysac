@@ -14,8 +14,10 @@
 #define __MYSAC_H__
 
 #include <stdlib.h>
+#include <time.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/time.h>
 #include <mysql/errmsg.h>
 #include <mysql/mysql.h>
 
@@ -366,6 +368,38 @@ int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...);
 int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id);
 
 /**
+ * Initialize MYSAC_RES structur
+ * This function can not allocate memory, just use your buffer.
+ *
+ * @param buffer this buffer must contain all the sql response.
+ *        this size is:
+ *        sizeof(MYSAC_RES) +
+ *        ( sizeof(MYSQL_FIELD) * nb_field ) + 
+ *        ( different fields names )
+ *
+ *        and for each row:
+ *        sizeof(MYSAC_ROWS) +
+ *        ( sizeof(MYSAC_ROW) * nb_field ) +
+ *        ( sizeof(unsigned long) * nb_field ) +
+ *        ( sizeof(struct tm) for differents date fields of the request ) +
+ *        ( differents strings returned by the request ) +
+ *
+ * @param len is the len of the buffer
+ *
+ * @return MYSAC_RES. this function cannot be fail
+ */
+static inline
+MYSAC_RES *mysac_init_res(char *buffer, int len) {
+	MYSAC_RES *res;
+
+	res = (MYSAC_RES *)buffer;
+	res->buffer = buffer + sizeof(MYSAC_RES);
+	res->buffer_len = len - sizeof(MYSAC_RES);
+
+	return res;
+}
+
+/**
  * Execute statement
  *
  * @param mysac Should be the address of an existing MYSAC structur.
@@ -430,38 +464,6 @@ int mysac_send_query(MYSAC *mysac);
  *         (my_ulonglong)~0, which is equivalent).
  */
 int mysac_affected_rows(MYSAC *mysac);
-
-/**
- * Initialize MYSAC_RES structur
- * This function can not allocate memory, just use your buffer.
- *
- * @param buffer this buffer must contain all the sql response.
- *        this size is:
- *        sizeof(MYSAC_RES) +
- *        ( sizeof(MYSQL_FIELD) * nb_field ) + 
- *        ( different fields names )
- *
- *        and for each row:
- *        sizeof(MYSAC_ROWS) +
- *        ( sizeof(MYSAC_ROW) * nb_field ) +
- *        ( sizeof(unsigned long) * nb_field ) +
- *        ( sizeof(struct tm) for differents date fields of the request ) +
- *        ( differents strings returned by the request ) +
- *
- * @param len is the len of the buffer
- *
- * @return MYSAC_RES. this function cannot be fail
- */
-static inline
-MYSAC_RES *mysac_init_res(char *buffer, int len) {
-	MYSAC_RES *res;
-
-	res = (MYSAC_RES *)buffer;
-	res->buffer = buffer + sizeof(MYSAC_RES);
-	res->buffer_len = len - sizeof(MYSAC_RES);
-
-	return res;
-}
 
 /**
  * Returns the number of columns for the most recent query on the connection.
