@@ -245,6 +245,7 @@ void mysac_main(int fd, void *arg) {
 		err = mysac_send_database(m);
 		if (err != 0) break;
 
+#if 0
 		/* prepare query */
 		my->state = STMT;
 		err = mysac_set_stmt_prepare(m, query);
@@ -255,6 +256,7 @@ void mysac_main(int fd, void *arg) {
 	   prepare statement 
 
 	**************************************************/ 
+
 	case STMT:
 		err = mysac_send_stmt_prepare(m, &my->stmt_id);
 		if (err != 0) break;
@@ -271,10 +273,35 @@ void mysac_main(int fd, void *arg) {
 		my->state = QUERY;
 
 	case QUERY:
-		gettimeofday(&avant, NULL);
-
 		err = mysac_send_stmt_execute(m);
 		if (err != 0) break;
+
+#else
+
+	/**************************************************
+
+	  prepare query
+
+	**************************************************/
+	case_QUERY:
+
+		res = mysac_init_res(buffer, BUFFERSIZE);
+		mysac_set_query(m, res, query);
+		if (err != 0) break;
+		my->state = QUERY;
+
+	/**************************************************
+
+	  send query
+
+	**************************************************/
+	case QUERY:
+		err = mysac_send_query(m);
+		if (err != 0) break;
+		
+#endif
+
+		gettimeofday(&avant, NULL);
 
 #if 1
 		fprintf(stderr, "request return ok\n");
@@ -421,8 +448,8 @@ int main(int argc, char *argv[]) {
 
 	else
 //		query = "CALL search()";
-		query = big_query;
-//		query = "SELECT * FROM toto"; /* retourne tous les types */
+//		query = big_query;
+		query = "SELECT * FROM toto"; /* retourne tous les types */
 //		query = "SELECT TIMEDIFF(NOW(), test.ze_date) AS DIFF FROM test";
 //		query = "SELECT COUNT(*) AS COUNT FROM test;";
 
@@ -440,8 +467,8 @@ int main(int argc, char *argv[]) {
 	//mysac_setup(m, "127.0.0.1:3306", "root", "root", "nagios", 0);
 	mysac_setup(m, "127.0.0.1:3306", "root", "root", NULL, 0);
 
-	database = "nagios";
-	// database = "tests";
+	//database = "nagios";
+	database = "tests";
 	mysac_connect(m);
 
 	/* call connect */
