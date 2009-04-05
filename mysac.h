@@ -284,6 +284,8 @@ void mysac_setup(MYSAC *mysac, const char *my_addr, const char *user,
  * @param mysac Should be the address of an existing MYSQL structure.
  *
  * @return
+ * 	MYERR_WANT_READ        : want read socket
+ * 	MYERR_WANT_WRITE       : want write socket
  *    CR_CONN_HOST_ERROR     : Failed to connect to the MySQL server.
  *    CR_CONNECTION_ERROR    : Failed to connect to the local MySQL server.
  *    CR_IPSOCK_ERROR        : Failed to create an IP socket.
