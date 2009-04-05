@@ -37,4 +37,9 @@ clean:
 doc:
 	doxygen mysac.doxygen
 
+api:
+	echo " " > header_file
+	rm -rf apidoc >/dev/null 2>&1
+	doxygen mysac-api.doxygen
+
 include make.deps

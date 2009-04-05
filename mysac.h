@@ -110,7 +110,7 @@ enum my_query_st {
 	MYSAC_READ_LINE
 };
 
-#define MYSAC_BUFFER_SIZE (1024*1024)
+#define MYSAC_BUFFER_SIZE (1024*10)
 #define MYSAC_COL_MAX_LEN 50
 #define MYSAC_COL_MAX_NUN 100
 
@@ -159,7 +159,7 @@ typedef union {
 /**
  * This is chained element. contain pointer to each elements of one row
  */
-typedef struct mysac_rows {
+typedef struct {
 	struct list_head link;
 	unsigned long *lengths;
 	MYSAC_ROW *data;
@@ -168,7 +168,7 @@ typedef struct mysac_rows {
 /**
  * This contain the complete result of one request
  */
-typedef struct mysac_res {
+typedef struct {
 	char *buffer;
 	int buffer_len;
 	int nb_cols;
@@ -182,7 +182,7 @@ typedef struct mysac_res {
 /**
  * This contain the necessary for one mysql connection
  */
-typedef struct mysac {
+typedef struct {
 	char buf[MYSAC_BUFFER_SIZE];
 	int len;
 	char *read;
