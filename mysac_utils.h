@@ -7,7 +7,7 @@
 
 /* definitions imported from linux-2.6.24/include/linux/list.h */
 
-static inline void INIT_LIST_HEAD(struct list_head *list) {
+static inline void INIT_LIST_HEAD(struct mysac_list_head *list) {
 	list->next = list;
 	list->prev = list;
 }
@@ -18,9 +18,9 @@ static inline void INIT_LIST_HEAD(struct list_head *list) {
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static inline void __list_add(struct list_head *new,
-                              struct list_head *prev,
-                              struct list_head *next) {
+static inline void __list_add(struct mysac_list_head *new,
+                              struct mysac_list_head *prev,
+                              struct mysac_list_head *next) {
 	next->prev = new;
 	new->next = next;
 	new->prev = prev;
@@ -35,7 +35,8 @@ static inline void __list_add(struct list_head *new,
  * Insert a new entry before the specified head.
  * This is useful for implementing queues.
  */
-static inline void list_add_tail(struct list_head *new, struct list_head *head) {
+static inline void list_add_tail(struct mysac_list_head *new,
+                                 struct mysac_list_head *head) {
 	__list_add(new, head->prev, head);
 }
 
@@ -46,7 +47,8 @@ static inline void list_add_tail(struct list_head *new, struct list_head *head) 
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static inline void __list_del(struct list_head * prev, struct list_head * next) {
+static inline void __list_del(struct mysac_list_head * prev,
+                              struct mysac_list_head * next) {
 	next->prev = prev;
 	prev->next = next;
 }
@@ -57,7 +59,7 @@ static inline void __list_del(struct list_head * prev, struct list_head * next) 
  * Note: list_empty() on entry does not return true after this, the entry is
  * in an undefined state.
  */
-static inline void list_del(struct list_head *entry) {
+static inline void list_del(struct mysac_list_head *entry) {
 	__list_del(entry->prev, entry->next);
 }
 

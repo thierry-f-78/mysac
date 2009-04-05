@@ -22,7 +22,7 @@
 #include <mysql/mysql.h>
 
 /* def imported from: linux-2.6.24/include/linux/stddef.h */
-#define offset_of(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#define mysac_offset_of(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 /**
  * container_of - cast a member of a structure out to the containing structure
@@ -34,9 +34,9 @@
  * @param member the name of the member within the struct.
  *
  */
-#define container_of(ptr, type, member) ({ \
+#define mysac_container_of(ptr, type, member) ({ \
 	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-	(type *)( (char *)__mptr - offset_of(type,member) );})
+	(type *)( (char *)__mptr - mysac_offset_of(type,member) );})
 
 /**
  * Simple doubly linked list implementation.
@@ -49,8 +49,8 @@
  * generate better code by using them directly rather than
  * using the generic single-entry routines.
  */
-struct list_head {
-	struct list_head *next, *prev;
+struct mysac_list_head {
+	struct mysac_list_head *next, *prev;
 };
 
 /**
@@ -62,8 +62,8 @@ struct list_head {
  * @param type:   the type of the struct this is embedded in.
  * @param member: the name of the list_struct within the struct.
  */
-#define list_entry(ptr, type, member) \
-	container_of(ptr, type, member)
+#define mysac_list_entry(ptr, type, member) \
+	mysac_container_of(ptr, type, member)
 
 /**
  * list_first_entry - get the first element from a list
@@ -75,11 +75,11 @@ struct list_head {
  *
  * Note, that list is expected to be not empty.
  */
-#define list_first_entry(ptr, type, member) \
-	list_entry((ptr)->next, type, member)
+#define mysac_list_first_entry(ptr, type, member) \
+	mysac_list_entry((ptr)->next, type, member)
 
-#define list_next_entry(ptr, type, member) \
-	list_first_entry(ptr, type, member);
+#define mysac_list_next_entry(ptr, type, member) \
+	mysac_list_first_entry(ptr, type, member);
 
 enum my_query_st {
 	MYSAC_START,
@@ -160,7 +160,7 @@ typedef union {
  * This is chained element. contain pointer to each elements of one row
  */
 typedef struct {
-	struct list_head link;
+	struct mysac_list_head link;
 	unsigned long *lengths;
 	MYSAC_ROW *data;
 } MYSAC_ROWS;
@@ -175,7 +175,7 @@ typedef struct {
 	int nb_lines;
 	int nb_time;
 	MYSQL_FIELD *cols;
-	struct list_head data;
+	struct mysac_list_head data;
 	MYSAC_ROWS *cr;
 } MYSAC_RES;
 
@@ -515,9 +515,9 @@ unsigned long mysac_num_rows(MYSAC_RES *res) {
 static inline
 MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
 	if (res->cr == NULL)
-		res->cr = list_first_entry(&res->data, MYSAC_ROWS, link);
+		res->cr = mysac_list_first_entry(&res->data, MYSAC_ROWS, link);
 	else
-		res->cr = list_next_entry(&res->cr->link, MYSAC_ROWS, link);
+		res->cr = mysac_list_next_entry(&res->cr->link, MYSAC_ROWS, link);
 	if (&res->data == &res->cr->link) {
 		res->cr = NULL;
 		return NULL;
