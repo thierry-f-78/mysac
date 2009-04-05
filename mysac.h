@@ -411,18 +411,6 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id);
 
 /**
- * send stmt execute command
- *
- * @param mysac Should be the address of an existing MYSQL structure.
- *
- * @return 
- */
-static inline
-int mysac_send_stmt_execute(MYSAC *mysac) {
-	return mysac_send_query(mysac);
-}
-
-/**
  * Initialize query
  *
  * @param mysac Should be the address of an existing MYSAC structur.
@@ -445,6 +433,18 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...);
  *  ...
  */
 int mysac_send_query(MYSAC *mysac);
+
+/**
+ * send stmt execute command
+ *
+ * @param mysac Should be the address of an existing MYSQL structure.
+ *
+ * @return 
+ */
+static inline
+int mysac_send_stmt_execute(MYSAC *mysac) {
+	return mysac_send_query(mysac);
+}
 
 /**
  * After executing a statement with mysql_query() returns the number of rows
