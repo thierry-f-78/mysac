@@ -227,7 +227,7 @@ typedef struct {
 } MYSAC;
 
 /**
- * Allocates or initializes a MYSQL object suitable for mysql_real_connect().
+ * Allocates or initializes a MYSQL object.
  * If mysql is a NULL pointer, the function allocates, initializes, and
  * returns a new object. Otherwise, the object is initialized and the address
  * of the object is returned. If mysql_init() allocates a new object, it is
