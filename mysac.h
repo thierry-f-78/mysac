@@ -437,6 +437,18 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...);
 int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap);
 
 /**
+ * This function return the mysql response pointer 
+ *
+ * @param mysac Should be the address of an existing MYSAC structure.
+ *
+ * @return mysql response pointer
+ */
+static inline
+MYSAC_RES *mysac_get_res(MYSAC *mysac) {
+	return mysac->res;
+}
+
+/**
  * Send sql query command
  * 
  * @param mysac Should be the address of an existing MYSAC structur.
