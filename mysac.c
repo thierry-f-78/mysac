@@ -722,8 +722,7 @@ int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id) 
 
 
 
-int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...) {
-	va_list ap;
+int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap) {
 	int len;
 
 	/* set packet number */
@@ -733,7 +732,6 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...) {
 	mysac->buf[4] = COM_QUERY;
 
 	/* build sql query */
-	va_start(ap, fmt);
 	len = vsnprintf(&mysac->buf[5], MYSAC_BUFFER_SIZE-5, fmt, ap);
 	if (len >= MYSAC_BUFFER_SIZE - 5)
 		return -1;
@@ -748,6 +746,13 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...) {
 	mysac->qst = MYSAC_SEND_QUERY;
 
 	return 0;
+}
+
+int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...) {
+	va_list ap;
+
+	va_start(ap, fmt);
+	mysac_v_set_query(mysac, res, fmt, ap);
 }
 
 int mysac_send_query(MYSAC *mysac) {

@@ -14,6 +14,7 @@
 #define __MYSAC_H__
 
 #include <stdlib.h>
+#include <stdarg.h>
 #include <time.h>
 #include <errno.h>
 #include <string.h>
@@ -422,6 +423,18 @@ int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id);
  * @return 0: ok, -1 nok
  */
 int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...);
+
+/**
+ * Initialize query
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param fmt is the output format with the printf style
+ * @param ap is the argument list on format vprintf
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap);
 
 /**
  * Send sql query command
