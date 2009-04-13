@@ -1,6 +1,7 @@
 #include "mysac.h"
 
 const char *mysac_errors[] ={
+	[0]                     = "no error",
 	[MYERR_PROTOCOL_ERROR]  = "mysql protocol error",
 	[MYERR_BUFFER_OVERSIZE] = "buffer oversize",
 	[MYERR_PACKET_CORRUPT]  = "packet corrupted",
