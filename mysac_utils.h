@@ -88,32 +88,34 @@ static inline void to_my_4(int value, char *m) {
   252          2           = value of following 16-bit word
   253          3           = value of following 24-bit word
   254          8           = value of following 64-bit word
+
+  fichier mysql: source mysql: sql/pack.c
 */
 static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
 	if (len < 1)
 		return -1;
 	switch ((unsigned char)m[0]) {
 
-	case 251:
+	case 251: /* fb : 1 octet */
 		*r = 0;
 		*nul=1;
 		return 1;
 
-	case 252:
+	case 252: /* fc : 2 octets */
 		if (len < 3)
 			return -1;
 		*r = uint2korr(&m[1]);
 		*nul=0;
 		return 3;
 
-	case 253:
+	case 253: /* fd : 4 octets */
 		if (len < 5)
 			return -1;
-		*r = uint4korr(&m[1]);
+		*r = uint3korr(&m[1]);
 		*nul=0;
 		return 5;
 
-	case 254:
+	case 254: /* fe */
 		if (len < 9)
 			return -1;
 		*r = uint8korr(&m[1]);
