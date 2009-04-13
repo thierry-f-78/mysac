@@ -562,6 +562,7 @@ MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
  *
  * @return the value generated for an AUTO_INCREMENT column
  */
+static inline
 unsigned long mysac_insert_id(MYSAC *m) {
 	return m->insert_id;
 }
