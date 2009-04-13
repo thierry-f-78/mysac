@@ -91,7 +91,7 @@ static inline void to_my_4(int value, char *m) {
 
   fichier mysql: source mysql: sql/pack.c
 */
-static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
+static inline int my_lcb_ll(char *m, unsigned long long *r,  char *nul, int len) {
 	if (len < 1)
 		return -1;
 	switch ((unsigned char)m[0]) {
@@ -127,5 +127,13 @@ static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
 		*nul=0;
 		return 1;
 	}
+}
+
+static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
+	unsigned long long val;
+	int retcode;
+	retcode = my_lcb_ll(m, &val, nul, len);
+	*r = val;
+	return retcode;
 }
 #endif
