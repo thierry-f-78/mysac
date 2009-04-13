@@ -206,9 +206,10 @@ typedef struct {
 	unsigned int options;
 	unsigned int charset;
 	unsigned int status;
-	unsigned int affected_rows;
+	unsigned long affected_rows;
 	unsigned int warnings;
 	unsigned int errorcode;
+	unsigned long insert_id;
 	char *mysql_code;
 	char *mysql_error;
 	char eof;
@@ -550,6 +551,23 @@ MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
 	return res->cr->data;
 }
 
+/**
+ * Returns the value generated for an AUTO_INCREMENT column by the previous
+ * INSERT or UPDATE statement. Use this function after you have performed an
+ * INSERT statement into a table that contains an AUTO_INCREMENT field
+ *
+ * http://dev.mysql.com/doc/refman/5.0/en/mysql-insert-id.html
+ *
+ * @param m Should be the address of an existing MYSQL structure.
+ *
+ * @return the value generated for an AUTO_INCREMENT column
+ */
+unsigned long mysac_insert_id(MYSAC *m) {
+	return m->insert_id;
+}
+
+
+
 #if 0
 mysql_fetch_fields() /*Returns an array of all field structures*/
 mysql_fetch_field() /*Returns the type of the next table field*/
@@ -696,7 +714,6 @@ mysql_get_ssl_cipher() /*Return current SSL cipher*/
 mysql_hex_string() /*Encode string in hexadecimal format*/
 mysql_info() /*Returns information about the most recently executed query*/
 mysql_init() /*Gets or initializes a MYSQL structure*/
-mysql_insert_id() /*Returns the ID generated for an AUTO_INCREMENT column by the previous query*/
 mysql_kill() /*Kills a given thread*/
 mysql_library_end() /*Finalize the MySQL C API library*/
 mysql_library_init() /*Initialize the MySQL C API library*/
