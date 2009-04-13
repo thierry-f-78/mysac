@@ -53,6 +53,10 @@ static int my_response(MYSAC *m) {
 	int i;
 	int err;
 	int errcode;
+	char *read;
+	unsigned long len;
+	unsigned long rlen;
+	char nul;
 
 	switch (m->readst) {
 
@@ -154,14 +158,26 @@ static int my_response(MYSAC *m) {
 		/* success */
 		else if ((unsigned char)m->read[0] == 0) {
 	
-			/* affected rows (wireshark donne 1 octet, mais en affiche 2 ...) */
-			m->affected_rows = uint2korr(&m->read[1]);
-	
+			read = &m->read[1];
+			rlen = m->packet_length - 1;
+
+			/* affected rows */
+			len = my_lcb(read, &m->affected_rows, &nul, rlen);
+			rlen -= len;
+			read += len;
+			/* m->affected_rows = uint2korr(&m->read[1]); */
+
+			/* insert id */
+			len = my_lcb(read, &m->insert_id, &nul, rlen);
+			rlen -= len;
+			read += len;
+
 			/* server status */
-			m->status = uint2korr(&m->read[3]);
+			m->status = uint2korr(read);
+			read += 2;
 	
 			/* server warnings */
-			m->warnings = uint2korr(&m->read[5]);
+			m->warnings = uint2korr(read);
 	
 			return MYSAC_RET_OK;
 		}
@@ -819,8 +835,12 @@ int mysac_send_query(MYSAC *mysac) {
 		if (err == MYSAC_RET_ERROR)
 			return mysac->errorcode;
 
+		/* ok ( for insert or no return data command ) */
+		if (err == MYSAC_RET_OK)
+			return 0;
+
 		/* protocol error */
-		else if (err != MYSAC_RET_DATA) {
+		if (err != MYSAC_RET_DATA) {
 			mysac->errorcode = MYERR_PROTOCOL_ERROR;
 			return mysac->errorcode;
 		}
