@@ -311,7 +311,11 @@ int mysac_connect(MYSAC *mysac);
  *
  * @param mysac Should be the address of an existing MYSQL structure.
  */
-void mysac_close(MYSAC *mysac);
+static inline
+void mysac_close(MYSAC *mysac) {
+	if (mysac->free_it == 1)
+		free(mysac);
+}
 
 /**
  * This function return the mysql filedescriptor used for connection
