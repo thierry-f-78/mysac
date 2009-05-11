@@ -118,12 +118,12 @@ static inline int my_lcb_ll(char *m, unsigned long long *r,  char *nul, int len)
 		*nul=0;
 		return 3;
 
-	case 253: /* fd : 4 octets */
-		if (len < 5)
+	case 253: /* fd : 3 octets */
+		if (len < 4)
 			return -1;
 		*r = uint3korr(&m[1]);
 		*nul=0;
-		return 5;
+		return 4;
 
 	case 254: /* fe */
 		if (len < 9)
