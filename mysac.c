@@ -938,7 +938,7 @@ int mysac_send_query(MYSAC *mysac) {
 		                         &res->cols[mysac->read_id]);
 
 		if (len == -1) {
-			mysac->errorcode = MYERR_PACKET_CORRUPT;
+			mysac->errorcode = MYERR_STRFIELD_CORRUPT;
 			return mysac->errorcode;
 		}
 		mysac->read += len;
@@ -1071,7 +1071,7 @@ int mysac_send_query(MYSAC *mysac) {
 			len = mysac_decode_string_row(mysac->read, mysac->packet_length,
 			                              res, res->cr);
 			if (len == -1) {
-				mysac->errorcode = MYERR_PACKET_CORRUPT;
+				mysac->errorcode = MYERR_STRFIELD_CORRUPT;
 				return mysac->errorcode;
 			}
 			mysac->read += len;
@@ -1089,7 +1089,7 @@ int mysac_send_query(MYSAC *mysac) {
 			len = mysac_decode_binary_row(mysac->read, mysac->packet_length,
 			                              res, res->cr);
 			if (len == -1) {
-				mysac->errorcode = MYERR_PACKET_CORRUPT;
+				mysac->errorcode = MYERR_BINFIELD_CORRUPT;
 				return mysac->errorcode;
 			}
 			mysac->read += len;

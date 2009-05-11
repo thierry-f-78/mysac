@@ -25,6 +25,8 @@ const char *mysac_errors[]  = {
 	[MYERR_SYSTEM]           = "system error (see errno)",
 	[MYERR_CANT_CONNECT]     = "can not connect to host",
 	[MYERR_BUFFER_TOO_SMALL] = "the buffer can not contain request",
-	[MYERR_UNEXPECT_R_STATE] = "Unexpected state when reading data"
+	[MYERR_UNEXPECT_R_STATE] = "Unexpected state when reading data",
+	[MYERR_STRFIELD_CORRUPT] = "Mysql string mode field corrupt",
+	[MYERR_BINFIELD_CORRUPT] = "Mysql binary mode field corrupt"
 };
 
