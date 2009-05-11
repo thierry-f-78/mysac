@@ -27,6 +27,8 @@ const char *mysac_errors[]  = {
 	[MYERR_BUFFER_TOO_SMALL] = "the buffer can not contain request",
 	[MYERR_UNEXPECT_R_STATE] = "Unexpected state when reading data",
 	[MYERR_STRFIELD_CORRUPT] = "Mysql string mode field corrupt",
-	[MYERR_BINFIELD_CORRUPT] = "Mysql binary mode field corrupt"
+	[MYERR_BINFIELD_CORRUPT] = "Mysql binary mode field corrupt",
+	[MYERR_BAD_LCB]          = "Mysql protocol bad length coded binary",
+	[MYERR_LEN_OVER_BUFFER]  = "Mysql protocol give len over the buffer size"
 };
 

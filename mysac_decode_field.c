@@ -64,10 +64,10 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	/* n (Length Coded String)   catalog */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 	if (tmp_len == -1)
-		return -1;
+		return -MYERR_BAD_LCB;
 	i += tmp_len;
 	if (i + size > len)
-		return -1;
+		return -MYERR_LEN_OVER_BUFFER;
 	col->catalog_length = size;
 	memmove(wh, &buf[i], size);
 	col->catalog = wh;
@@ -78,10 +78,10 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	/* n (Length Coded String)    db */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 	if (tmp_len == -1)
-		return -1;
+		return -MYERR_BAD_LCB;
 	i += tmp_len;
 	if (i + size > len)
-		return -1;
+		return -MYERR_LEN_OVER_BUFFER;
 	col->db_length = size;
 	memmove(wh, &buf[i], size);
 	col->db = wh;
@@ -92,10 +92,10 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	/* n (Length Coded String)    table */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 	if (tmp_len == -1)
-		return -1;
+		return -MYERR_BAD_LCB;
 	i += tmp_len;
 	if (i + size > len)
-		return -1;
+		return -MYERR_LEN_OVER_BUFFER;
 	col->table_length = size;
 	memmove(wh, &buf[i], size);
 	col->table = wh;
@@ -106,10 +106,10 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	/* n (Length Coded String)    org_table */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 	if (tmp_len == -1)
-		return -1;
+		return -MYERR_BAD_LCB;
 	i += tmp_len;
 	if (i + size > len)
-		return -1;
+		return -MYERR_LEN_OVER_BUFFER;
 	col->org_table_length = size;
 	memmove(wh, &buf[i], size);
 	col->org_table = wh;
@@ -120,10 +120,10 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	/* n (Length Coded String)    name */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 	if (tmp_len == -1)
-		return -1;
+		return -MYERR_BAD_LCB;
 	i += tmp_len;
 	if (i + size > len)
-		return -1;
+		return -MYERR_LEN_OVER_BUFFER;
 	col->name_length = size;
 	memmove(wh, &buf[i], size);
 	col->name = wh;
@@ -134,10 +134,10 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	/* n (Length Coded String)    org_name */
 	tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 	if (tmp_len == -1)
-		return -1;
+		return -MYERR_BAD_LCB;
 	i += tmp_len;
 	if (i + size > len)
-		return -1;
+		return -MYERR_LEN_OVER_BUFFER;
 	col->org_name_length = size;
 	memmove(wh, &buf[i], size);
 	col->org_name = wh;
@@ -147,7 +147,7 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 
 	/* check len */
 	if (i + 13 > len)
-		return -1;
+		return -MYERR_LEN_OVER_BUFFER;
 
 	/* (filler) */
 	i += 1;
@@ -179,10 +179,10 @@ int mysac_decode_field(char *buf, int len, MYSQL_FIELD *col) {
 	if (len-i > 0) {
 		tmp_len = my_lcb(&buf[i], &size, &nul, len-i);
 		if (tmp_len == -1)
-			return -1;
+			return -MYERR_BAD_LCB;
 		i += tmp_len;
 		if (i + size > len)
-			return -1;
+			return -MYERR_LEN_OVER_BUFFER;
 		col->def_length = size;
 		memmove(wh, &buf[i], size);
 		col->def = wh;
