@@ -759,8 +759,11 @@ int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap)
 
 	/* build sql query */
 	len = vsnprintf(&mysac->buf[5], MYSAC_BUFFER_SIZE-5, fmt, ap);
-	if (len >= MYSAC_BUFFER_SIZE - 5)
+	if (len >= MYSAC_BUFFER_SIZE - 5) {
+		mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
+		mysac->len = 0;
 		return -1;
+	}
 
 	/* len */
 	to_my_3(len + 1, &mysac->buf[0]);
