@@ -58,6 +58,12 @@ const char *mysac_type[] = {
 	[MYSQL_TYPE_GEOMETRY]    = "MYSQL_TYPE_GEOMETRY"
 };
 
+enum read_state {
+	RDST_INIT = 0,
+	RDST_READ_LEN,
+	RDST_READ_DATA,
+	RDST_DECODE_DATA
+};
 
 static int my_response(MYSAC *m) {
 	int i;
@@ -68,14 +74,14 @@ static int my_response(MYSAC *m) {
 	unsigned long rlen;
 	char nul;
 
-	switch (m->readst) {
+	switch ((enum read_state)m->readst) {
 
-	case 0:
+	case RDST_INIT:
 		m->len = 0;
-		m->readst = 1;
+		m->readst = RDST_READ_LEN;
 
 	/* read length */
-	case 1:
+	case RDST_READ_LEN:
 		/* check for avalaible size in buffer */
 		if (m->read_len < 4) {	
 			m->errorcode = MYERR_BUFFER_OVERSIZE;
@@ -101,11 +107,11 @@ static int my_response(MYSAC *m) {
 		m->packet_number = m->read[3];
 
 		/* update read state */
-		m->readst = 2;
+		m->readst = RDST_READ_DATA;
 		m->len = 0;
 
 	/* read data */
-	case 2:
+	case RDST_READ_DATA:
 		/* check for avalaible size in buffer */
 		if (m->read_len < m->packet_length) {	
 			m->errorcode = MYERR_BUFFER_OVERSIZE;
@@ -124,11 +130,11 @@ static int my_response(MYSAC *m) {
 		m->read_len -= m->packet_length;
 
 		/* re-init eof */
-		m->readst = 3;
+		m->readst = RDST_DECODE_DATA;
 		m->eof = 1;
 
 	/* decode data */
-	case 3:
+	case RDST_DECODE_DATA:
 
 		/* error */
 		if ((unsigned char)m->read[0] == 255) {
