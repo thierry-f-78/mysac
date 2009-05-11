@@ -29,6 +29,13 @@ const char *mysac_errors[]  = {
 	[MYERR_STRFIELD_CORRUPT] = "Mysql string mode field corrupt",
 	[MYERR_BINFIELD_CORRUPT] = "Mysql binary mode field corrupt",
 	[MYERR_BAD_LCB]          = "Mysql protocol bad length coded binary",
-	[MYERR_LEN_OVER_BUFFER]  = "Mysql protocol give len over the buffer size"
+	[MYERR_LEN_OVER_BUFFER]  = "Mysql protocol give len over the packet size",
+	[MYERR_CONVLONG]         = "Error in string to long int type conversion",
+	[MYERR_CONVLONGLONG]     = "Error in string to long long int type conversion",
+	[MYERR_CONVFLOAT]        = "Error in string to float type conversion",
+	[MYERR_CONVDOUBLE]       = "Error in string to double type conversion",
+	[MYERR_CONVTIME]         = "Error in time string to time conversion",
+	[MYERR_CONVTIMESTAMP]    = "Error in timestamp string to time conversion",
+	[MYERR_CONVDATE]         = "Error in date string to time conversion"
 };
 

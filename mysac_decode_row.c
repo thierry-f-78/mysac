@@ -277,14 +277,13 @@ int mysac_decode_string_row(char *buf, int packet_len,
 	for (j = 0; j < res->nb_cols; j++) {
 
 		tmp_len = my_lcb(&buf[i], &len, &nul, packet_len-i);
-
 		if (tmp_len == -1)
-			return -1;
+			return -MYERR_BAD_LCB;
 
 		i += tmp_len;
 
 		if (i + len > packet_len)
-			return -1;
+			return -MYERR_LEN_OVER_BUFFER;
 
 		if (nul == 1) {
 			row->data[j].blob = NULL;
@@ -329,7 +328,7 @@ int mysac_decode_string_row(char *buf, int packet_len,
 			buf[i+len] = '\0';
 			row->data[j].sint = strtol(&buf[i], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVLONG;
 			buf[i+len] = mem;
 			break;
 
@@ -338,7 +337,7 @@ int mysac_decode_string_row(char *buf, int packet_len,
 			buf[i+len] = '\0';
 			row->data[j].sbigint = strtoll(&buf[i], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVLONG;
 			buf[i+len] = mem;
 			break;
 
@@ -347,7 +346,7 @@ int mysac_decode_string_row(char *buf, int packet_len,
 			buf[i+len] = '\0';
 			row->data[j].mfloat = strtof(&buf[i], &error);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVFLOAT;
 			buf[i+len] = mem;
 			break;
 
@@ -356,7 +355,7 @@ int mysac_decode_string_row(char *buf, int packet_len,
 			buf[i+len] = '\0';
 			row->data[j].mdouble = strtod(&buf[i], &error);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVDOUBLE;
 			buf[i+len] = mem;
 			break;
 
@@ -370,13 +369,13 @@ int mysac_decode_string_row(char *buf, int packet_len,
 			row->data[j].tv.tv_usec = 0;
 			row->data[j].tv.tv_sec  = strtol(&buf[i], &error, 10) * 3600;
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIME;
 			row->data[j].tv.tv_sec += strtol(&buf[i+3], &error, 10) * 60;
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIME;
 			row->data[j].tv.tv_sec += strtol(&buf[i+6], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIME;
 			buf[i+8] = mem;
 			break;
 
@@ -403,22 +402,22 @@ int mysac_decode_string_row(char *buf, int packet_len,
 			buf[i+19] = '\0';
 			row->data[j].tm->tm_year = strtol(&buf[i], &error, 10) - 1900;
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIMESTAMP;
 			row->data[j].tm->tm_mon  = strtol(&buf[i+5], &error, 10) - 1;
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIMESTAMP;
 			row->data[j].tm->tm_mday = strtol(&buf[i+8], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIMESTAMP;
 			row->data[j].tm->tm_hour = strtol(&buf[i+11], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIMESTAMP;
 			row->data[j].tm->tm_min  = strtol(&buf[i+14], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIMESTAMP;
 			row->data[j].tm->tm_sec  = strtol(&buf[i+17], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVTIMESTAMP;
 			buf[i+19] = mem;
 			break;
 
@@ -431,13 +430,13 @@ int mysac_decode_string_row(char *buf, int packet_len,
 			buf[i+10] = '\0';
 			row->data[j].tm->tm_year = strtol(&buf[i], &error, 10) - 1900;
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVDATE;
 			row->data[j].tm->tm_mon  = strtol(&buf[i+5], &error, 10) - 1;
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVDATE;
 			row->data[j].tm->tm_mday = strtol(&buf[i+8], &error, 10);
 			if (*error != '\0')
-				return -1;
+				return -MYERR_CONVDATE;
 			buf[i+10] = mem;
 			break;
 

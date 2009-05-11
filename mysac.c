@@ -1070,8 +1070,8 @@ int mysac_send_query(MYSAC *mysac) {
 #endif
 			len = mysac_decode_string_row(mysac->read, mysac->packet_length,
 			                              res, res->cr);
-			if (len == -1) {
-				mysac->errorcode = MYERR_STRFIELD_CORRUPT;
+			if (len < 0) {
+				mysac->errorcode = len * -1;
 				return mysac->errorcode;
 			}
 			mysac->read += len;
