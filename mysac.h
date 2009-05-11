@@ -111,7 +111,6 @@ enum my_query_st {
 	MYSAC_READ_LINE
 };
 
-#define MYSAC_BUFFER_SIZE (1024*10)
 #define MYSAC_COL_MAX_LEN 50
 #define MYSAC_COL_MAX_NUN 100
 
@@ -129,7 +128,8 @@ enum {
 	MYERR_RESOLV_HOST,
 	MYERR_SYSTEM,
 	MYERR_CANT_CONNECT,
-	MYERR_BUFFER_TOO_SMALL
+	MYERR_BUFFER_TOO_SMALL,
+	MYERR_UNEXPECT_R_STATE
 };
 
 extern const char *mysac_type[];
@@ -185,7 +185,6 @@ typedef struct {
  * This contain the necessary for one mysql connection
  */
 typedef struct {
-	char buf[MYSAC_BUFFER_SIZE];
 	int len;
 	char *read;
 	int read_len;
@@ -227,21 +226,38 @@ typedef struct {
 	enum my_query_st qst;
 	int read_id;
 	MYSAC_RES *res;
+
+	/* the buffer */
+	unsigned int bufsize;
+	char *buf;
 } MYSAC;
 
 /**
- * Allocates or initializes a MYSQL object.
+ * Allocates and initializes a MYSQL object.
+ * If mysql is a NULL pointer, the function allocates, initializes, and
+ * returns a new object. Otherwise, the object is initialized and the address
+ * of the object is returned. If mysql_init() allocates a new object, it is
+ * freed when mysql_close() is called to close the connection.
+ *
+ * @param buffsize is the size of the buffer
+ *
+ * @return An initialized MYSAC* handle. NULL if there was insufficient memory
+ *         to allocate a new object.
+ */
+MYSAC *mysac_new(int buffsize);
+
+/**
+ * Initializes a MYSQL object.
  * If mysql is a NULL pointer, the function allocates, initializes, and
  * returns a new object. Otherwise, the object is initialized and the address
  * of the object is returned. If mysql_init() allocates a new object, it is
  * freed when mysql_close() is called to close the connection.
  *
  * @param mysac Should be the address of an existing MYSAC structure.
- *
- * @return An initialized MYSAC* handle. NULL if there was insufficient memory
- *         to allocate a new object.
+ * @param buffer is ptr on the pre-allocated buffer
+ * @param buffsize is the size of the buffer
  */
-MYSAC *mysac_init(MYSAC *mysac);
+void mysac_init(MYSAC *mysac, char *buffer, unsigned int buffsize);
 
 /**
  * mysac_connect() attempts to establish a connection to a MySQL database engine

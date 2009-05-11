@@ -200,29 +200,49 @@ static int my_response(MYSAC *m) {
 		 */
 		else
 			return MYSAC_RET_DATA;
+	
+	default:
+		m->errorcode = MYERR_UNEXPECT_R_STATE;
+		return MYSAC_RET_ERROR;
 	}
 
 	m->errorcode = MYERR_PACKET_CORRUPT;
 	return MYSAC_RET_ERROR;
 }
 
-MYSAC *mysac_init(MYSAC *mysac) {
-	MYSAC *m;
+void mysac_init(MYSAC *mysac, char *buffer, unsigned int buffsize) {
 
-	/* memory */
-	if (mysac == NULL) {
-		m = malloc(sizeof(MYSAC));
-		if (m == NULL)
-			return NULL;
-		m->free_it = 1;
-	}
+	/* init */
+	memset(mysac, 0, sizeof(MYSAC));
+	mysac->qst = MYSAC_START;
+	mysac->buf = buffer;
+	mysac->bufsize = buffsize;
+}
+
+MYSAC *mysac_new(int buffsize) {
+	MYSAC *m;
+	char *buf;
+
+	/* struct memory */
+	m = malloc(sizeof(MYSAC));
+	if (m == NULL)
+		return NULL;
 	
-	else
-		m = mysac;
+	/* buff memory */
+	buf = malloc(buffsize);
+	if (buf == NULL) {
+		free(m);
+		return NULL;
+	}
 
 	/* init */
 	memset(m, 0, sizeof(MYSAC));
+	m->free_it = 1;
 	m->qst = MYSAC_START;
+	m->buf = buf;
+	m->bufsize = buffsize;
+
+	return m;
 }
 
 void mysac_setup(MYSAC *mysac, const char *my_addr, const char *user,
@@ -271,7 +291,7 @@ int mysac_connect(MYSAC *mysac) {
 		mysac->len = 0;
 		mysac->readst = 0;
 		mysac->read = mysac->buf;
-		mysac->read_len = MYSAC_BUFFER_SIZE;
+		mysac->read_len = mysac->bufsize;
 
 	/***********************************************
 	 read greatings
@@ -415,7 +435,7 @@ int mysac_connect(MYSAC *mysac) {
 		mysac->qst = MYSAC_RECV_AUTH_1;
 		mysac->readst = 0;
 		mysac->read = mysac->buf;
-		mysac->read_len = MYSAC_BUFFER_SIZE;
+		mysac->read_len = mysac->bufsize;
 
 	/***********************************************
 	 read response 1
@@ -487,7 +507,7 @@ int mysac_connect(MYSAC *mysac) {
 		mysac->qst = MYSAC_RECV_AUTH_1;
 		mysac->readst = 0;
 		mysac->read = mysac->buf;
-		mysac->read_len = MYSAC_BUFFER_SIZE;
+		mysac->read_len = mysac->bufsize;
 		goto case_MYSAC_RECV_AUTH_1;
 		
 	}
@@ -583,8 +603,8 @@ int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...) {
 
 	/* build sql query */
 	va_start(ap, fmt);
-	len = vsnprintf(&mysac->buf[5], MYSAC_BUFFER_SIZE-5, fmt, ap);
-	if (len >= MYSAC_BUFFER_SIZE - 5)
+	len = vsnprintf(&mysac->buf[5], mysac->bufsize - 5, fmt, ap);
+	if (len >= mysac->bufsize - 5)
 		return -1;
 
 	/* len */
@@ -758,8 +778,8 @@ int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap)
 	mysac->buf[4] = COM_QUERY;
 
 	/* build sql query */
-	len = vsnprintf(&mysac->buf[5], MYSAC_BUFFER_SIZE-5, fmt, ap);
-	if (len >= MYSAC_BUFFER_SIZE - 5) {
+	len = vsnprintf(&mysac->buf[5], mysac->bufsize - 5, fmt, ap);
+	if (len >= mysac->bufsize - 5) {
 		mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
 		mysac->len = 0;
 		return -1;

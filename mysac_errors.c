@@ -24,6 +24,7 @@ const char *mysac_errors[]  = {
 	[MYERR_RESOLV_HOST]      = "can not resolve host name",
 	[MYERR_SYSTEM]           = "system error (see errno)",
 	[MYERR_CANT_CONNECT]     = "can not connect to host",
-	[MYERR_BUFFER_TOO_SMALL] = "the buffer can not contain request"
+	[MYERR_BUFFER_TOO_SMALL] = "the buffer can not contain request",
+	[MYERR_UNEXPECT_R_STATE] = "Unexpected state when reading data"
 };
 
