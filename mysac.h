@@ -167,6 +167,7 @@ typedef union {
 	                               MYSQL_TYPE_TIMESTAMP TIMESTAMP */
 	char* string;               /* MYSQL_TYPE_STRING    TEXT,CHAR,VARCHAR */
 	char* blob;                 /* MYSQL_TYPE_BLOB      BLOB,BINARY,VARBINARY */
+	void *ptr;                  /* generic pointer */
 } MYSAC_ROW;
 
 /**
