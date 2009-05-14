@@ -584,6 +584,23 @@ MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
 }
 
 /**
+ * Set pointer on the first row, you can exec mysac_fetch_row, return it the
+ * first row;
+ */
+static inline
+void mysac_first_row(MYSAC_RES *res) {
+	res->cr == NULL;
+}
+
+/**
+ * Get current row, dont touch row ptr
+ */
+static inline
+MYSAC_ROW *mysac_cur_row(MYSAC_RES *res) {
+	return res->cr->data;
+}
+
+/**
  * Returns the value generated for an AUTO_INCREMENT column by the previous
  * INSERT or UPDATE statement. Use this function after you have performed an
  * INSERT statement into a table that contains an AUTO_INCREMENT field
