@@ -590,7 +590,7 @@ MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
  */
 static inline
 void mysac_first_row(MYSAC_RES *res) {
-	res->cr == NULL;
+	res->cr = NULL;
 }
 
 /**
