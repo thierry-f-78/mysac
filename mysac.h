@@ -429,6 +429,10 @@ static inline
 MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	MYSAC_RES *res;
 
+	/* check minimu length */
+	if (len < sizeof(MYSAC_RES))
+		return NULL;
+
 	res = (MYSAC_RES *)buffer;
 	res->buffer = buffer + sizeof(MYSAC_RES);
 	res->buffer_len = len - sizeof(MYSAC_RES);
