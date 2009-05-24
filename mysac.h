@@ -434,6 +434,8 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 		return NULL;
 
 	res = (MYSAC_RES *)buffer;
+	res->nb_cols = 0;
+	res->nb_lines = 0;
 	res->buffer = buffer + sizeof(MYSAC_RES);
 	res->buffer_len = len - sizeof(MYSAC_RES);
 
