@@ -164,5 +164,5 @@ int main(int argc, char *argv[]) {
 		diff.tv_sec--;
 		diff.tv_usec += 1000000;
 	}
-	printf("%u rows in set (%u.%06u s)\n", mysac_field_count(r), diff.tv_sec, diff.tv_usec);
+	printf("%u rows in set (%u.%06u s)\n", mysac_num_rows(r), diff.tv_sec, diff.tv_usec);
 }
