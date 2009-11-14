@@ -16,7 +16,7 @@ pack:
 	tar --exclude .git -C /tmp/ -vzcf mysac-$(BUILDVER).tar.gz mysac-$(BUILDVER) && \
 	rm -rf /tmp/mysac-$(BUILDVER) >/dev/null 2>&1; \
 
-lib: libmysac.a 
+lib: libmysac.a exemple
 #libmysac.so
 
 libmysac.so: libmysac.a
@@ -31,6 +31,9 @@ make.deps: *.c *.h
 		echo "$${src//.c/.o}: $$src $$DEPS"; \
 	done > make.deps
 
+exemple: libmysac.a
+	$(MAKE) -C exemple CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
+
 clean:
 	rm -rf make.deps libmysac.so libmysac.a main.o man html $(OBJS)
 
@@ -43,3 +46,5 @@ api:
 	doxygen mysac-api.doxygen
 
 include make.deps
+
+.PHONY: exemple
