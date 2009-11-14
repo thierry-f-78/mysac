@@ -1,19 +1,11 @@
 /*
  * Copyright (c) 2009 Thierry FOURNIER
  *
- * This file is part of MySAC.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License.
  *
- * MySAC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License
- *
- * MySAC is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with MySAC.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <stdlib.h>
@@ -780,6 +772,38 @@ int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id) 
 	return 0;
 }
 
+inline
+int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, int len) {
+
+	/* set packet number */
+	mysac->buf[3] = 0;
+
+	/* set mysql command */
+	mysac->buf[4] = COM_QUERY;
+
+	/* build sql query */
+	if (mysac->bufsize - 5 < len) {
+		mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
+		mysac->len = 0;
+		return -1;
+	}
+	memcpy(&mysac->buf[5], query, len);
+
+	/* len */
+	to_my_3(len + 1, &mysac->buf[0]);
+
+	/* send params */
+	mysac->res = res;
+	mysac->send = mysac->buf;
+	mysac->len = len + 5;
+	mysac->qst = MYSAC_SEND_QUERY;
+
+	return 0;
+}
+
+int mysac_s_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query) {
+	return mysac_b_set_query(mysac, res, query, strlen(query));
+}
 
 inline
 int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap) {

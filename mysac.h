@@ -1,19 +1,11 @@
 /*
  * Copyright (c) 2009 Thierry FOURNIER
  *
- * This file is part of MySAC.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License.
  *
- * MySAC is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License
- *
- * MySAC is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with MySAC.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /** @file */ 
@@ -483,6 +475,29 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...);
  * @return 0: ok, -1 nok
  */
 int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap);
+
+/**
+ * Initialize query
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param query is a string (terminated by \0) containing the query
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_s_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query);
+
+/**
+ * Initialize query
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param query is a string containing the query
+ * @param len is the len of the query
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, int len);
 
 /**
  * This function return the mysql response pointer 
