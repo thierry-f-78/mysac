@@ -44,7 +44,6 @@ int main(int argc, char *argv[]) {
 	int i;
 	char *q;
 	struct timeval start, stop, diff;
-	int fd;
 	MYSAC my;
 	MYSAC_RES *r;
 	const char *host;
@@ -79,14 +78,11 @@ int main(int argc, char *argv[]) {
 	/* init memory */
 	mysac_init(&my, buf, BUFS);
 
-	/* get file descriptor */
-	fd = mysac_get_fd(&my);
-
 	/* init connection */
 	mysac_setup(&my, host, login, pass, db, 0);
 	while (1) {
 		ret_code = mysac_connect(&my);
-		if (!wait(fd, ret_code))
+		if (!wait(mysac_get_fd(&my), ret_code))
 			break;
 	}
 	if (ret_code != 0) {
@@ -98,7 +94,7 @@ int main(int argc, char *argv[]) {
 	mysac_set_database(&my, db);
 	while (1) {
 		ret_code = mysac_send_database(&my);
-		if (!wait(fd, ret_code))
+		if (!wait(mysac_get_fd(&my), ret_code))
 			break;
 	}
 	if (ret_code != 0) {
@@ -113,7 +109,7 @@ int main(int argc, char *argv[]) {
 	/* send query to database */
 	while (1) {
 		ret_code = mysac_send_query(&my);
-		if (!wait(fd, ret_code))
+		if (!wait(mysac_get_fd(&my), ret_code))
 			break;
 	}
 
@@ -144,7 +140,7 @@ int main(int argc, char *argv[]) {
 	/* send query to database */
 	while (1) {
 		ret_code = mysac_send_query(&my);
-		if (!wait(fd, ret_code))
+		if (!wait(mysac_get_fd(&my), ret_code))
 			break;
 	}
 
