@@ -843,7 +843,7 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...) {
 	va_list ap;
 
 	va_start(ap, fmt);
-	mysac_v_set_query(mysac, res, fmt, ap);
+	return mysac_v_set_query(mysac, res, fmt, ap);
 }
 
 int mysac_send_query(MYSAC *mysac) {
