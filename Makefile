@@ -35,6 +35,7 @@ exemple: libmysac.a
 	$(MAKE) -C exemple CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
 
 clean:
+	$(MAKE) -C exemple clean
 	rm -rf make.deps libmysac.so libmysac.a main.o man html $(OBJS)
 
 doc:
