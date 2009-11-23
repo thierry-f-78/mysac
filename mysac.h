@@ -196,7 +196,7 @@ typedef struct {
 /**
  * This contain the necessary for one mysql connection
  */
-typedef struct {
+typedef struct mysac {
 	int len;
 	char *read;
 	int read_len;
@@ -209,6 +209,7 @@ typedef struct {
 	/* mysac */
 	char free_it;
 	int fd;
+	int (*call_it)(/* MYSAC * */ struct mysac *);
 
 	/*defconnect */
 	unsigned int protocol;
@@ -357,6 +358,16 @@ void mysac_close(MYSAC *mysac) {
 static inline
 int mysac_get_fd(MYSAC *mysac) {
 	return mysac->fd;
+}
+
+/**
+ *
+ */
+static inline
+int mysac_io(MYSAC *my) {
+	if (my == NULL || my->call_it == NULL)
+		return 0;
+	return my->call_it(my);
 }
 
 /**
