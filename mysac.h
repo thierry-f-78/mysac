@@ -362,13 +362,20 @@ int mysac_get_fd(MYSAC *mysac) {
 }
 
 /**
+ * this function call the io function associated with the current
+ * command. (mysac_send_database, mysac_send_query and mysac_connect)
  *
+ * @param mysac Should be the address of an existing MYSAC structure.
+ *
+ * @return 0 is ok, or all errors associated with functions
+ *         mysac_send_database, mysac_send_query and mysac_connect or
+ *    MYERR_BAD_STATE : the function does nothing to do (is an error)
  */
 static inline
-int mysac_io(MYSAC *my) {
-	if (my == NULL || my->call_it == NULL)
-		return 0;
-	return my->call_it(my);
+int mysac_io(MYSAC *mysac) {
+	if (mysac == NULL || mysac->call_it == NULL)
+		return MYERR_BAD_STATE;
+	return mysac->call_it(mysac);
 }
 
 /**
