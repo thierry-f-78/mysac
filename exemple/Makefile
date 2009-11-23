@@ -16,4 +16,4 @@ client_iofunc.o: client_iofunc.c
 	$(CC) -c -o client_iofunc.o client_iofunc.c $(CFLAGS) $(MY_CFLAGS)
 
 clean:
-	client.o client_iofunc.o client client_iofunc
+	rm -f client.o client_iofunc.o client client_iofunc

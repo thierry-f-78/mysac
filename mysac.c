@@ -19,6 +19,7 @@
 #include "mysac_decode_field.h"
 #include "mysac_decode_row.h"
 #include "mysac.h"
+#include "mysac_net.h"
 #include "mysac_utils.h"
 
 enum my_response_t {
@@ -516,7 +517,23 @@ int mysac_connect(MYSAC *mysac) {
 		mysac->read = mysac->buf;
 		mysac->read_len = mysac->bufsize;
 		goto case_MYSAC_RECV_AUTH_1;
-		
+	
+	case MYSAC_SEND_QUERY:
+	case MYSAC_RECV_QUERY_COLNUM:
+	case MYSAC_RECV_QUERY_COLDESC:
+	case MYSAC_RECV_QUERY_EOF1:
+	case MYSAC_RECV_QUERY_DATA:
+	case MYSAC_SEND_INIT_DB:
+	case MYSAC_RECV_INIT_DB:
+	case MYSAC_SEND_STMT_QUERY:
+	case MYSAC_RECV_STMT_QUERY:
+	case MYSAC_SEND_STMT_EXECUTE:
+	case MYSAC_RECV_STMT_EXECUTE:
+	case MYSAC_READ_NUM:
+	case MYSAC_READ_HEADER:
+	case MYSAC_READ_LINE:
+		return MYERR_BAD_STATE;
+
 	}
 
 	return 0;
@@ -524,7 +541,6 @@ int mysac_connect(MYSAC *mysac) {
 
 int mysac_set_database(MYSAC *mysac, const char *database) {
 	int i;
-	int len;
 
 	/* set packet number */
 	mysac->buf[3] = 0;
@@ -596,7 +612,30 @@ int mysac_send_database(MYSAC *mysac) {
 			mysac->errorcode = MYERR_PROTOCOL_ERROR;
 			return mysac->errorcode;
 		}
+
+	case MYSAC_START:
+	case MYSAC_CONN_CHECK:
+	case MYSAC_READ_GREATINGS:
+	case MYSAC_SEND_AUTH_1:
+	case MYSAC_RECV_AUTH_1:
+	case MYSAC_SEND_AUTH_2:
+	case MYSAC_SEND_QUERY:
+	case MYSAC_RECV_QUERY_COLNUM:
+	case MYSAC_RECV_QUERY_COLDESC:
+	case MYSAC_RECV_QUERY_EOF1:
+	case MYSAC_RECV_QUERY_DATA:
+	case MYSAC_SEND_STMT_QUERY:
+	case MYSAC_RECV_STMT_QUERY:
+	case MYSAC_SEND_STMT_EXECUTE:
+	case MYSAC_RECV_STMT_EXECUTE:
+	case MYSAC_READ_NUM:
+	case MYSAC_READ_HEADER:
+	case MYSAC_READ_LINE:
+		return MYERR_BAD_STATE;
+
 	}
+
+	return MYERR_BAD_STATE;
 }
 
 int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...) {
@@ -744,14 +783,32 @@ int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id) {
 		}
 
 		return 0;
+	
+	case MYSAC_START:
+	case MYSAC_CONN_CHECK:
+	case MYSAC_READ_GREATINGS:
+	case MYSAC_SEND_AUTH_1:
+	case MYSAC_RECV_AUTH_1:
+	case MYSAC_SEND_AUTH_2:
+	case MYSAC_SEND_QUERY:
+	case MYSAC_RECV_QUERY_COLNUM:
+	case MYSAC_RECV_QUERY_DATA:
+	case MYSAC_SEND_INIT_DB:
+	case MYSAC_RECV_INIT_DB:
+	case MYSAC_SEND_STMT_EXECUTE:
+	case MYSAC_RECV_STMT_EXECUTE:
+	case MYSAC_READ_NUM:
+	case MYSAC_READ_HEADER:
+	case MYSAC_READ_LINE:
+		return MYERR_BAD_STATE;
 	}
+
+	return MYERR_BAD_STATE;
 }
 
 
 
 int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id) {
-	va_list ap;
-	int len;
 
 	/* set packet number */
 	mysac->buf[3] = 0;
@@ -849,11 +906,7 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...) {
 int mysac_send_query(MYSAC *mysac) {
 	int err;
 	int errcode;
-	int i, j;
-	unsigned long size;
-	char nul;
-	int use_stmt_fmt;
-	char c;
+	int i;
 	int len;
 	MYSAC_RES *res;
 
@@ -1049,6 +1102,8 @@ int mysac_send_query(MYSAC *mysac) {
 	/* struct tm */
 	for (i=0; i<mysac->res->nb_cols; i++) {
 		switch(mysac->res->cols[i].type) {
+
+		/* date type */	
 		case MYSQL_TYPE_TIME:
 		case MYSQL_TYPE_YEAR:
 		case MYSQL_TYPE_TIMESTAMP:
@@ -1062,6 +1117,32 @@ int mysac_send_query(MYSAC *mysac) {
 			mysac->read += sizeof(struct tm);
 			mysac->read_len -= sizeof(struct tm);
 			memset(mysac->res->cr->data[i].tm, 0, sizeof(struct tm));
+			break;
+
+		/* do nothing for other types */
+		case MYSQL_TYPE_DECIMAL:
+		case MYSQL_TYPE_TINY:
+		case MYSQL_TYPE_SHORT:
+		case MYSQL_TYPE_LONG:
+		case MYSQL_TYPE_FLOAT:
+		case MYSQL_TYPE_DOUBLE:
+		case MYSQL_TYPE_NULL:
+		case MYSQL_TYPE_LONGLONG:
+		case MYSQL_TYPE_INT24:
+		case MYSQL_TYPE_NEWDATE:
+		case MYSQL_TYPE_VARCHAR:
+		case MYSQL_TYPE_BIT:
+		case MYSQL_TYPE_NEWDECIMAL:
+		case MYSQL_TYPE_ENUM:
+		case MYSQL_TYPE_SET:
+		case MYSQL_TYPE_TINY_BLOB:
+		case MYSQL_TYPE_MEDIUM_BLOB:
+		case MYSQL_TYPE_LONG_BLOB:
+		case MYSQL_TYPE_BLOB:
+		case MYSQL_TYPE_VAR_STRING:
+		case MYSQL_TYPE_STRING:
+		case MYSQL_TYPE_GEOMETRY:
+			break;
 		}
 	}
 
@@ -1141,6 +1222,25 @@ int mysac_send_query(MYSAC *mysac) {
 		/* next line */
 		mysac->res->nb_lines++;
 		goto case_MYSAC_RECV_QUERY_DATA;
+
+	case MYSAC_START:
+	case MYSAC_CONN_CHECK:
+	case MYSAC_READ_GREATINGS:
+	case MYSAC_SEND_AUTH_1:
+	case MYSAC_RECV_AUTH_1:
+	case MYSAC_SEND_AUTH_2:
+	case MYSAC_SEND_INIT_DB:
+	case MYSAC_RECV_INIT_DB:
+	case MYSAC_SEND_STMT_QUERY:
+	case MYSAC_RECV_STMT_QUERY:
+	case MYSAC_SEND_STMT_EXECUTE:
+	case MYSAC_RECV_STMT_EXECUTE:
+	case MYSAC_READ_NUM:
+	case MYSAC_READ_HEADER:
+	case MYSAC_READ_LINE:
+		return MYERR_BAD_STATE;
 	}
+
+	return MYERR_BAD_STATE;
 }
 
