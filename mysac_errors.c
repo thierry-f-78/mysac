@@ -21,6 +21,7 @@ const char *mysac_errors[]  = {
 	[MYERR_MYSQL_ERROR]      = "mysql server return an error",
 	[MYERR_SERVER_LOST]      = "server network connexion is break",
 	[MYERR_BAD_PORT]         = "bad port number",
+	[MYERR_BAD_STATE]        = "unexpected internal error: bad state",
 	[MYERR_RESOLV_HOST]      = "can not resolve host name",
 	[MYERR_SYSTEM]           = "system error (see errno)",
 	[MYERR_CANT_CONNECT]     = "can not connect to host",

@@ -535,6 +535,7 @@ int mysac_connect(MYSAC *mysac) {
 	case MYSAC_READ_NUM:
 	case MYSAC_READ_HEADER:
 	case MYSAC_READ_LINE:
+		mysac->errorcode = MYERR_BAD_STATE;
 		return MYERR_BAD_STATE;
 
 	}
@@ -636,10 +637,12 @@ int mysac_send_database(MYSAC *mysac) {
 	case MYSAC_READ_NUM:
 	case MYSAC_READ_HEADER:
 	case MYSAC_READ_LINE:
+		mysac->errorcode = MYERR_BAD_STATE;
 		return MYERR_BAD_STATE;
 
 	}
 
+	mysac->errorcode = MYERR_BAD_STATE;
 	return MYERR_BAD_STATE;
 }
 
@@ -910,9 +913,11 @@ int mysac_send_stmt_prepare(MYSAC *mysac) {
 	case MYSAC_READ_NUM:
 	case MYSAC_READ_HEADER:
 	case MYSAC_READ_LINE:
+		mysac->errorcode = MYERR_BAD_STATE;
 		return MYERR_BAD_STATE;
 	}
 
+	mysac->errorcode = MYERR_BAD_STATE;
 	return MYERR_BAD_STATE;
 }
 
@@ -1425,9 +1430,11 @@ int mysac_send_query(MYSAC *mysac) {
 	case MYSAC_READ_LINE:
 	case MYSAC_RECV_QUERY_COLDESC2:
 	case MYSAC_RECV_QUERY_EOF2:
+		mysac->errorcode = MYERR_BAD_STATE;
 		return MYERR_BAD_STATE;
 	}
 
+	mysac->errorcode = MYERR_BAD_STATE;
 	return MYERR_BAD_STATE;
 }
 
