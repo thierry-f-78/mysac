@@ -90,6 +90,16 @@ static inline void to_my_4(int value, char *m) {
 	m[1] = value >> 8;
 	m[0] = value;
 }
+static inline void to_my_8(long long value, char *m) {
+	m[7] = value >> 56;
+	m[6] = value >> 48;
+	m[5] = value >> 40;
+	m[4] = value >> 32;
+	m[3] = value >> 24;
+	m[2] = value >> 16;
+	m[1] = value >> 8;
+	m[0] = value;
+}
 
 /* length coded binary
   0-250        0           = value of first byte
@@ -146,4 +156,73 @@ static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
 	*r = val;
 	return retcode;
 }
+
+/* length coded binary
+  0-250        0           = value of first byte
+  251          0           column value = NULL
+	                        only appropriate in a Row Data Packet
+  252          2           = value of following 16-bit word
+  253          3           = value of following 24-bit word
+  254          8           = value of following 64-bit word
+
+  fichier mysql: source mysql: sql/pack.c
+*/
+static inline int set_my_lcb(unsigned long long len, int null, char *out, int out_len) {
+
+	/* set null */
+	if (null == 1) {
+		if (out_len < 1)
+			return -1;
+		out[0] = 251;
+		return 1;
+	}
+
+	/* set value 0-250 */
+	if (len >= 0 && len <= 250) {
+		if (out_len < 1)
+			return -1;
+		out[0] = len;
+		return 1;
+	}
+
+	/* set 2 bytes value 251-65535 */
+	if (len >= 251 && len < 0xffff) {
+		if (out_len < 3)
+			return -1;
+		out[0] = 252;
+		to_my_2(len, &out[1]);
+		return 3;
+	}
+
+	/* set 3 bytes value 65536-16777215 */
+	if (len > 0xffff && len <= 0xffffff) {
+		if (out_len < 4)
+			return -1;
+		out[0] = 253;
+		to_my_3(len, &out[1]);
+		return 4;
+	}
+
+	/* set 4 bytes value 65536-4294967295 */
+	if (len > 0xffffff && len <= 0xffffffff) {
+		if (out_len < 5)
+			return -1;
+		out[0] = 254;
+		to_my_4(len, &out[1]);
+		return 5;
+	}
+
+	/* set 8 bytes value 4294967296-18446744073709551615 */
+	if (len > 0xffffffff && len <= 0xffffffffffffffffULL) {
+		if (out_len < 9)
+			return -1;
+		out[0] = 254;
+		to_my_4(len, &out[1]);
+		return 9;
+	}
+
+	/* error */
+	return -1;
+}
+
 #endif

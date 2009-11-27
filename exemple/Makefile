@@ -1,7 +1,7 @@
 MY_CFLAGS = -I..
 MY_LDFLAGS = -L.. -lmysac 
 
-all: client client_iofunc
+all: client client_iofunc client_stmt
 
 client: client.o
 	$(CC) -o client client.o $(LDFLAGS) $(MY_LDFLAGS)
@@ -15,5 +15,11 @@ client_iofunc: client_iofunc.o
 client_iofunc.o: client_iofunc.c
 	$(CC) -c -o client_iofunc.o client_iofunc.c $(CFLAGS) $(MY_CFLAGS)
 
+client_stmt: client_stmt.o
+	$(CC) -o client_stmt client_stmt.o $(LDFLAGS) $(MY_LDFLAGS)
+
+client_stmt.o: client_stmt.c
+	$(CC) -c -o client_stmt.o client_stmt.c $(CFLAGS) $(MY_CFLAGS)
+
 clean:
-	rm -f client.o client_iofunc.o client client_iofunc
+	rm -f *.o client client_iofunc client_stmt

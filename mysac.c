@@ -17,6 +17,7 @@
 #include <mysql/my_global.h>
 
 #include "mysac_decode_field.h"
+#include "mysac_encode_values.h"
 #include "mysac_decode_row.h"
 #include "mysac.h"
 #include "mysac_net.h"
@@ -520,8 +521,10 @@ int mysac_connect(MYSAC *mysac) {
 	
 	case MYSAC_SEND_QUERY:
 	case MYSAC_RECV_QUERY_COLNUM:
-	case MYSAC_RECV_QUERY_COLDESC:
+	case MYSAC_RECV_QUERY_COLDESC1:
+	case MYSAC_RECV_QUERY_COLDESC2:
 	case MYSAC_RECV_QUERY_EOF1:
+	case MYSAC_RECV_QUERY_EOF2:
 	case MYSAC_RECV_QUERY_DATA:
 	case MYSAC_SEND_INIT_DB:
 	case MYSAC_RECV_INIT_DB:
@@ -621,8 +624,10 @@ int mysac_send_database(MYSAC *mysac) {
 	case MYSAC_SEND_AUTH_2:
 	case MYSAC_SEND_QUERY:
 	case MYSAC_RECV_QUERY_COLNUM:
-	case MYSAC_RECV_QUERY_COLDESC:
+	case MYSAC_RECV_QUERY_COLDESC1:
+	case MYSAC_RECV_QUERY_COLDESC2:
 	case MYSAC_RECV_QUERY_EOF1:
+	case MYSAC_RECV_QUERY_EOF2:
 	case MYSAC_RECV_QUERY_DATA:
 	case MYSAC_SEND_STMT_QUERY:
 	case MYSAC_RECV_STMT_QUERY:
@@ -638,8 +643,42 @@ int mysac_send_database(MYSAC *mysac) {
 	return MYERR_BAD_STATE;
 }
 
-int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...) {
-	va_list ap;
+int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+                             const char *request, int len) {
+
+	/* set packet number */
+	mysac->buf[3] = 0;
+
+	/* set mysql command */
+	mysac->buf[4] = COM_STMT_PREPARE;
+
+	/* check len */
+	if (mysac->bufsize - 5 < len)
+		return -1;
+
+	/* build sql query */
+	memcpy(&mysac->buf[5], request, len);
+
+	/* l */
+	to_my_3(len + 1, &mysac->buf[0]);
+
+	/* send params */
+	mysac->send = mysac->buf;
+	mysac->len = len + 5;
+	mysac->qst = MYSAC_SEND_STMT_QUERY;
+	mysac->call_it = mysac_send_stmt_prepare;
+	mysac->stmt_id = stmt_id;
+
+	return 0;
+}
+
+int mysac_s_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+                             const char *request) {
+	return mysac_b_set_stmt_prepare(mysac, stmt_id, request, strlen(request));
+}
+
+int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+                             const char *fmt, va_list ap) {
 	int len;
 
 	/* set packet number */
@@ -649,7 +688,6 @@ int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...) {
 	mysac->buf[4] = COM_STMT_PREPARE;
 
 	/* build sql query */
-	va_start(ap, fmt);
 	len = vsnprintf(&mysac->buf[5], mysac->bufsize - 5, fmt, ap);
 	if (len >= mysac->bufsize - 5)
 		return -1;
@@ -661,11 +699,21 @@ int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...) {
 	mysac->send = mysac->buf;
 	mysac->len = len + 5;
 	mysac->qst = MYSAC_SEND_STMT_QUERY;
+	mysac->call_it = mysac_send_stmt_prepare;
+	mysac->stmt_id = stmt_id;
 
 	return 0;
 }
 
-int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id) {
+int mysac_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+                           const char *fmt, ...) {
+	va_list ap;
+
+	va_start(ap, fmt);
+	return mysac_v_set_stmt_prepare(mysac, stmt_id, fmt, ap);
+}
+
+int mysac_send_stmt_prepare(MYSAC *mysac) {
 	int err;
 	int errcode;
 
@@ -711,27 +759,31 @@ int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id) {
 			return mysac->errorcode;
 		}
 
-		/* get statement id */
-		*stmt_id = uint4korr(&mysac->buf[1]);
+		/* 0: don't care */
 
-		/* get nb of columns */
-		/* TODO prendre en compte cette valeur plus tard */
-		/* mysac->nb_cols = mysac->buf[5]; */
-		mysac->res = *(MYSAC_RES **)&mysac->buf[5];
+		/* 1-4: get statement id */
+		*mysac->stmt_id = uint4korr(&mysac->buf[1]);
 
-		mysac->read_id = 0;
+		/* 5-6: get nb of columns */
+		mysac->nb_cols = uint2korr(&mysac->buf[5]);
 
-		mysac->qst = MYSAC_RECV_QUERY_COLDESC;
+		/* 7-8: Number of placeholders in the statement */
+		mysac->nb_plhold = uint2korr(&mysac->buf[7]);
+
+		/* 9-.. don't care ! */
+
+		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
 
 	/**********************************************************
 	*
-	* receive column description
+	* receive place holder description
 	*
 	**********************************************************/
-	case_MYSAC_RECV_QUERY_COLDESC_2:
+	case_MYSAC_RECV_QUERY_COLDESC1:
 	mysac->readst = 0;
+	mysac->read = mysac->buf;
 
-	case MYSAC_RECV_QUERY_COLDESC:
+	case MYSAC_RECV_QUERY_COLDESC1:
 
 		err = my_response(mysac);
 
@@ -748,14 +800,12 @@ int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id) {
 			return mysac->errorcode;
 		}
 
-		/* TODO: voir plus atrd pour deceoder ça ... */
-		/* mysac_decode_field(mysac, &mysac->cols[mysac->read_id]); */
-
-		/* TODO ... un peu pourri */
-		mysac->read_id++;
-		/* if (mysac->read_id < mysac->nb_cols) */
-		if (mysac->read_id < (int)mysac->res)
-			goto case_MYSAC_RECV_QUERY_COLDESC_2;
+		/* XXX for a moment, dont decode columns
+		 * names and types
+		 */
+		mysac->nb_plhold--;
+		if (mysac->nb_plhold != 0)
+			goto case_MYSAC_RECV_QUERY_COLDESC1;
 		
 		mysac->readst = 0;
 		mysac->qst = MYSAC_RECV_QUERY_EOF1;
@@ -767,6 +817,66 @@ int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id) {
 	*
 	**********************************************************/
 	case MYSAC_RECV_QUERY_EOF1:
+		err = my_response(mysac);
+
+		if (err == MYERR_WANT_READ)
+			return MYERR_WANT_READ;
+
+		/* error */
+		if (err == MYSAC_RET_ERROR)
+			return mysac->errorcode;
+
+		/* protocol error */
+		else if (err != MYSAC_RET_EOF) {
+			mysac->errorcode = MYERR_PROTOCOL_ERROR;
+			return mysac->errorcode;
+		}
+
+		mysac->qst = MYSAC_RECV_QUERY_COLDESC2;
+
+	/**********************************************************
+	*
+	* receive column description
+	*
+	**********************************************************/
+	case_MYSAC_RECV_QUERY_COLDESC2:
+	mysac->readst = 0;
+	mysac->read = mysac->buf;
+
+	case MYSAC_RECV_QUERY_COLDESC2:
+
+		err = my_response(mysac);
+
+		if (err == MYERR_WANT_READ)
+			return MYERR_WANT_READ;
+
+		/* error */
+		if (err == MYSAC_RET_ERROR)
+			return mysac->errorcode;
+
+		/* protocol error */
+		else if (err != MYSAC_RET_DATA) {
+			mysac->errorcode = MYERR_PROTOCOL_ERROR;
+			return mysac->errorcode;
+		}
+
+		/* XXX for a moment, dont decode columns
+		 * names and types
+		 */
+		mysac->nb_cols--;
+		if (mysac->nb_cols != 0)
+			goto case_MYSAC_RECV_QUERY_COLDESC2;
+
+		mysac->readst = 0;
+		mysac->qst = MYSAC_RECV_QUERY_EOF2;
+		mysac->read = mysac->buf;
+
+	/**********************************************************
+	*
+	* receive EOF
+	*
+	**********************************************************/
+	case MYSAC_RECV_QUERY_EOF2:
 		err = my_response(mysac);
 
 		if (err == MYERR_WANT_READ)
@@ -808,25 +918,100 @@ int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id) {
 
 
 
-int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id) {
+int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id,
+                           MYSAC_BIND *values, int nb) {
+	int i;
+	int nb_bf;
+	int desc_off;
+	int vals_off;
+	int len = 3 + 1 + 1 + 4 + 1 + 4;
+	int ret;
 
-	/* set packet number */
+	/* check len */
+	if (mysac->bufsize < len) {
+		mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
+		mysac->len = 0;
+		return -1;
+	}
+
+	/* 3 : set packet number */
 	mysac->buf[3] = 0;
 
-	/* len */
-	to_my_3(5, &mysac->buf[0]);
-
-	/* set mysql command */
+	/* 4 : set mysql command */
 	mysac->buf[4] = COM_STMT_EXECUTE;
 
-	/* build sql query */
+	/* 5-8 : build sql query */
 	to_my_4(stmt_id, &mysac->buf[5]);
+
+	/* 9 : flags (unused) */
+	mysac->buf[9] = 0;
+
+	/* 10-13 : iterations (unused) */
+	to_my_4(1, &mysac->buf[10]);
+
+	/* number of bytes for the NULL values bitfield */
+	nb_bf = ( nb / 8 ) + 1;
+	desc_off = len + nb_bf + 1;
+	vals_off = desc_off + ( nb * 2 );
+
+	/* check len */
+	if (mysac->bufsize < vals_off) {
+		mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
+		mysac->len = 0;
+		return -1;
+	}
+
+	/* init bitfield: set 0 */
+	memset(&mysac->buf[len], 0, nb_bf);
+
+	/* build NULL bitfield and values type */
+	for (i=0; i<nb; i++) {
+
+		/***********************
+		 *
+		 * NULL bitfield
+		 *
+		 ***********************/
+		if (values[i].is_null != 0)
+			mysac->buf[len + (i << 3)] |= 1 << (i & 0xf);
+
+		/***********************
+		 *
+		 * Value type
+		 *
+		 ***********************/
+		mysac->buf[desc_off + ( i * 2 )] =  values[i].type;
+		mysac->buf[desc_off + ( i * 2 ) + 1] = 0x00; /* ???? */
+
+		/***********************
+		 *
+		 * set values data
+		 *
+		 ***********************/
+		ret = mysac_encode_value(&values[i], &mysac->buf[vals_off],
+		                         mysac->bufsize - vals_off);
+		if (ret < 0) {
+			mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
+			mysac->len = 0;
+			return -1;
+		}
+		vals_off += ret;
+	}
+
+	/* 01 byte ??? */
+	mysac->buf[len + nb_bf] = 0x01;
+
+	/* 0-2 : len
+	 * 4 = packet_len + packet_id
+	 */
+	to_my_3(vals_off - 4, &mysac->buf[0]);
 
 	/* send params */
 	mysac->res = res;
 	mysac->send = mysac->buf;
-	mysac->len = 9;
+	mysac->len = vals_off;
 	mysac->qst = MYSAC_SEND_QUERY;
+	mysac->call_it = mysac_send_stmt_execute;
 
 	return 0;
 }
@@ -976,7 +1161,7 @@ int mysac_send_query(MYSAC *mysac) {
 		/* get nb col TODO: pas sur que ce soit un byte */
 		res->nb_cols = mysac->read[0];
 		mysac->read_id = 0;
-		mysac->qst = MYSAC_RECV_QUERY_COLDESC;
+		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
 	
 		/* prepare cols space */
 
@@ -995,10 +1180,10 @@ int mysac_send_query(MYSAC *mysac) {
 	*
 	**********************************************************/
 
-	case_MYSAC_RECV_QUERY_COLDESC:
+	case_MYSAC_RECV_QUERY_COLDESC1:
 	mysac->readst = 0;
 
-	case MYSAC_RECV_QUERY_COLDESC:
+	case MYSAC_RECV_QUERY_COLDESC1:
 
 		err = my_response(mysac);
 
@@ -1035,7 +1220,7 @@ int mysac_send_query(MYSAC *mysac) {
 
 		mysac->read_id++;
 		if (mysac->read_id < res->nb_cols)
-			goto case_MYSAC_RECV_QUERY_COLDESC;
+			goto case_MYSAC_RECV_QUERY_COLDESC1;
 		
 		mysac->readst = 0;
 		mysac->qst = MYSAC_RECV_QUERY_EOF1;
@@ -1238,6 +1423,8 @@ int mysac_send_query(MYSAC *mysac) {
 	case MYSAC_READ_NUM:
 	case MYSAC_READ_HEADER:
 	case MYSAC_READ_LINE:
+	case MYSAC_RECV_QUERY_COLDESC2:
+	case MYSAC_RECV_QUERY_EOF2:
 		return MYERR_BAD_STATE;
 	}
 

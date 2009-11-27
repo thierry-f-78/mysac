@@ -93,8 +93,10 @@ enum my_query_st {
 
 	MYSAC_SEND_QUERY,
 	MYSAC_RECV_QUERY_COLNUM,
-	MYSAC_RECV_QUERY_COLDESC,
+	MYSAC_RECV_QUERY_COLDESC1,
+	MYSAC_RECV_QUERY_COLDESC2,
 	MYSAC_RECV_QUERY_EOF1,
+	MYSAC_RECV_QUERY_EOF2,
 	MYSAC_RECV_QUERY_DATA,
 
 	MYSAC_SEND_INIT_DB,
@@ -195,6 +197,16 @@ typedef struct {
 } MYSAC_RES;
 
 /**
+ * This contain list of values for statement binding
+ */
+typedef struct mysac_bind {
+	enum enum_field_types type;
+	void *value;
+	int value_len;
+	char is_null;
+} MYSAC_BIND;
+
+/**
  * This contain the necessary for one mysql connection
  */
 typedef struct mysac {
@@ -240,10 +252,15 @@ typedef struct mysac {
 	enum my_query_st qst;
 	int read_id;
 	MYSAC_RES *res;
+	unsigned long *stmt_id;
 
 	/* the buffer */
 	unsigned int bufsize;
 	char *buf;
+
+	/* special stmt */
+	int nb_cols;   /* number of columns in response */
+	int nb_plhold; /* number of placeholders in request */
 } MYSAC;
 
 /**
@@ -400,30 +417,6 @@ int mysac_set_database(MYSAC *mysac, const char *database);
 int mysac_send_database(MYSAC *mysac);
 
 /**
- * Prepare statement
- *
- * @param mysac Should be the address of an existing MYSAC structur.
- * @param fmt is the output format with the printf style
- *
- * @return 0: ok, -1 nok
- */
-int mysac_set_stmt_prepare(MYSAC *mysac, const char *fmt, ...);
-
-/**
- * Send sql query command
- * 
- * @param mysac Should be the address of an existing MYSAC structur.
- * @param stmt_id is pointer for storing the statement id
- *
- * @return
- *  0 => ok
- *  MYSAC_WANT_READ
- *  MYSAC_WANT_WRITE
- *  ...
- */
-int mysac_send_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id);
-
-/**
  * Initialize MYSAC_RES structur
  * This function can not allocate memory, just use your buffer.
  *
@@ -460,17 +453,6 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 
 	return res;
 }
-
-/**
- * Execute statement
- *
- * @param mysac Should be the address of an existing MYSAC structur.
- * @param res Should be the address of an existing MYSAC_RES structur.
- * @param stmt_id the statement id
- *
- * @return 0: ok, -1 nok
- */
-int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id);
 
 /**
  * Initialize query
@@ -542,6 +524,47 @@ MYSAC_RES *mysac_get_res(MYSAC *mysac) {
  *  ...
  */
 int mysac_send_query(MYSAC *mysac);
+
+/**
+ * Prepare statement
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param fmt is the output format with the printf style
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *fmt, ...);
+int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *fmt, va_list ap);
+int mysac_s_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *request);
+int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *request, int len);
+
+/**
+ * Send sql query command
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param stmt_id is pointer for storing the statement id
+ *
+ * @return
+ *  0 => ok
+ *  MYSAC_WANT_READ
+ *  MYSAC_WANT_WRITE
+ *  ...
+ */
+int mysac_send_stmt_prepare(MYSAC *mysac);
+
+/**
+ * Execute statement
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param stmt_id the statement id
+ * @param values is array of values send for the request
+ * @param nb is number of values
+ *
+ * @return 0: ok, -1 nok
+ */
+int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id,
+                           MYSAC_BIND *values, int nb);
 
 /**
  * send stmt execute command

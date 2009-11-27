@@ -5,7 +5,7 @@ BUILDVER := $(shell ref=`(git describe --tags) 2>/dev/null` && ref=$${ref%-g*} &
 CFLAGS = -DBUILDVER=$(BUILDVER) -I/usr/include/mysql -O0 -g -Wall -Werror
 LDFLAGS = -g -lmysqlclient_r
 
-OBJS = mysac.o mysac_net.o mysac_decode_field.o mysac_decode_row.o mysac_errors.o
+OBJS = mysac.o mysac_net.o mysac_decode_field.o mysac_decode_row.o mysac_encode_values.o mysac_errors.o
 
 build: make.deps
 	$(MAKE) lib
