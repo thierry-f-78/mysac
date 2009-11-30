@@ -3,6 +3,7 @@
 MYSQL_LIB := /usr/lib
 
 # Mysql include directory
+# exemple: <path>/mysql-5.1.41/include
 MYSQL_INC := /usr/include/mysql
 
 # get build version from the git tree in the form "lasttag-changes", 
