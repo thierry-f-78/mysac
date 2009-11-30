@@ -2,8 +2,9 @@
 # Mysql include directory
 MYSQL_INC := /usr/include/mysql
 
-# get build version from the git tree in the form "lasttag-changes", and use "dev" if unknown
-BUILDVER := $(shell ref=`(git describe --tags) 2>/dev/null` && ref=$${ref%-g*} && echo "$${ref\#v}")
+# get build version from the git tree in the form "lasttag-changes", 
+# and use "VERSION" file if unknown.
+BUILDVER := $(shell ./mysac_ver)
 
 CFLAGS = -DBUILDVER=$(BUILDVER) -I$(MYSQL_INC) -O0 -g -Wall -Werror
 LDFLAGS = -g -lmysqlclient_r
@@ -14,6 +15,8 @@ build: make.deps
 	$(MAKE) lib
 
 pack:
+	echo "$(BUILDVER)" > VERSION; \
+	cp VERSION /tmp/mysac-$(BUILDVER); \
 	rm -rf /tmp/mysac-$(BUILDVER) >/dev/null 2>&1; \
 	git clone . /tmp/mysac-$(BUILDVER) && \
 	tar --exclude .git -C /tmp/ -vzcf mysac-$(BUILDVER).tar.gz mysac-$(BUILDVER) && \
