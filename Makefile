@@ -37,10 +37,10 @@ build: make.deps
 	$(MAKE) lib
 
 pack:
-	echo "$(BUILDVER)" > VERSION; \
-	cp VERSION /tmp/mysac-$(BUILDVER); \
 	rm -rf /tmp/mysac-$(BUILDVER) >/dev/null 2>&1; \
 	git clone . /tmp/mysac-$(BUILDVER) && \
+	echo "$(BUILDVER)" > VERSION; \
+	cp VERSION /tmp/mysac-$(BUILDVER); \
 	tar --exclude .git -C /tmp/ -vzcf mysac-$(BUILDVER).tar.gz mysac-$(BUILDVER) && \
 	rm -rf /tmp/mysac-$(BUILDVER) >/dev/null 2>&1; \
 
