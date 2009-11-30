@@ -529,13 +529,46 @@ int mysac_send_query(MYSAC *mysac);
  * Prepare statement
  *
  * @param mysac Should be the address of an existing MYSAC structur.
+ * @param stmt_id is the receiver of the statement id
  * @param fmt is the output format with the printf style
  *
  * @return 0: ok, -1 nok
  */
 int mysac_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *fmt, ...);
+
+/**
+ * Prepare statement
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param stmt_id is the receiver of the statement id
+ * @param fmt is the output format with the printf style
+ * @param ap is the argument list on format vprintf
+ *
+ * @return 0: ok, -1 nok
+ */
 int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *fmt, va_list ap);
+
+/**
+ * Prepare statement
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param stmt_id is the receiver of the statement id
+ * @param query is a string (terminated by \0) containing the query
+ *
+ * @return 0: ok, -1 nok
+ */
 int mysac_s_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *request);
+
+/**
+ * Prepare statement
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param stmt_id is the receiver of the statement id
+ * @param request is a string containing the query
+ * @param len is the len of the query
+ *
+ * @return 0: ok, -1 nok
+ */
 int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id, const char *request, int len);
 
 /**
