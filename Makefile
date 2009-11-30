@@ -1,3 +1,6 @@
+# Mysql lib directory
+# exemple: <path>/mysql-5.1.41/libmysql_r/.libs
+MYSQL_LIB := /usr/lib
 
 # Mysql include directory
 MYSQL_INC := /usr/include/mysql
@@ -7,7 +10,7 @@ MYSQL_INC := /usr/include/mysql
 BUILDVER := $(shell ./mysac_ver)
 
 CFLAGS = -DBUILDVER=$(BUILDVER) -I$(MYSQL_INC) -O0 -g -Wall -Werror
-LDFLAGS = -g -lmysqlclient_r
+LDFLAGS = -g -L$(MYSQL_LIB) -lmysqlclient_r
 
 OBJS = mysac.o mysac_net.o mysac_decode_field.o mysac_decode_row.o mysac_encode_values.o mysac_errors.o
 
