@@ -710,6 +710,8 @@ void mysac_first_row(MYSAC_RES *res) {
  */
 static inline
 MYSAC_ROW *mysac_cur_row(MYSAC_RES *res) {
+	if (res->cr == NULL)
+		return NULL;
 	return res->cr->data;
 }
 
