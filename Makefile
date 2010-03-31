@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with MySAC.  If not, see <http://www.gnu.org/licenses/>.
 #
-
+SHELL=/bin/bash
 # Mysql lib directory
 # exemple: <path>/mysql-5.1.41/libmysql_r/.libs
 MYSQL_LIB := /usr/lib
