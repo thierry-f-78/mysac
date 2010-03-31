@@ -19,6 +19,7 @@
 /* the order of theses headers and defines
  * is important */
 #include <mysql/my_global.h>
+#include <mysql/m_string.h> /* memcpy_fixed */
 //#undef _ISOC99_SOURCE
 //#define _ISOC99_SOURCE
 //#include <stdlib.h>
