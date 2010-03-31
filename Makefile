@@ -28,7 +28,7 @@ MYSQL_INC := /usr/include/mysql
 # and use "VERSION" file if unknown.
 BUILDVER := $(shell ./mysac_ver)
 
-CFLAGS = -DBUILDVER=$(BUILDVER) -I$(MYSQL_INC) -O0 -g -Wall -Werror
+CFLAGS = -DBUILDVER=$(BUILDVER) -I$(MYSQL_INC) -O0 -g -Wall -Werror -fpic
 LDFLAGS = -g -L$(MYSQL_LIB) -lmysqlclient_r
 
 OBJS = mysac.o mysac_net.o mysac_decode_field.o mysac_decode_row.o mysac_encode_values.o mysac_errors.o
@@ -44,14 +44,14 @@ pack:
 	tar --exclude .git -C /tmp/ -vzcf mysac-$(BUILDVER).tar.gz mysac-$(BUILDVER) && \
 	rm -rf /tmp/mysac-$(BUILDVER) >/dev/null 2>&1; \
 
-lib: libmysac.a exemple
+lib: libmysac-static.a libmysac.so exemple
 #libmysac.so
 
-libmysac.so: libmysac.a
-	$(LD) -o libmysac.so -shared -soname libmysac.so.0.0 libmysac.a
+libmysac.so: $(OBJS)
+	$(LD) -o libmysac.so -shared -soname libmysac.so.0.0 $(OBJS)
 
-libmysac.a: $(OBJS)
-	$(AR) -rcv libmysac.a $(OBJS)
+libmysac-static.a: $(OBJS)
+	$(AR) -rcv libmysac-static.a $(OBJS)
 
 make.deps: *.c *.h
 	for src in *.c; do \
@@ -59,12 +59,12 @@ make.deps: *.c *.h
 		echo "$${src//.c/.o}: $$src $$DEPS"; \
 	done > make.deps
 
-exemple: libmysac.a
+exemple: libmysac-static.a
 	$(MAKE) -C exemple CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
 
 clean:
 	$(MAKE) -C exemple clean
-	rm -rf make.deps libmysac.so libmysac.a main.o man html $(OBJS)
+	rm -rf make.deps libmysac.so libmysac-static.a main.o man html $(OBJS)
 
 doc:
 	doxygen mysac.doxygen
