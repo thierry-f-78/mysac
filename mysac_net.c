@@ -183,7 +183,7 @@ int mysac_socket_connect(const char *socket_name, int *fd) {
 int mysac_socket_connect_check(int fd) {
 	int ret;
 	int code;
-	size_t len = sizeof(int);
+	socklen_t len = sizeof(int);
 
 	ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &code, &len);
 	if (ret != 0) {
