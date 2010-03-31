@@ -129,16 +129,14 @@ int mysac_encode_value(MYSAC_BIND *val, char *out, int len) {
 		if (len < 4)
 			return -1;
 		l = 4;
-		/* TODO: cast a revoir */
-		float4store((*(int *)val->value), out);
+		float4store((*(long *)val->value), out);
 		break;
 	
 	case MYSQL_TYPE_DOUBLE:
 		if (len < 8)
 			return -1;
 		l = 8;
-		/* TODO: cast a revoir */
-		float8store(*(int *)val->value, out);
+		float8store(*(long *)val->value, out);
 		break;
 	
 	/* libmysql/libmysql.c:3370
