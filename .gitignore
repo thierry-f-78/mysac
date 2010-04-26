@@ -1,0 +1,9 @@
+*.o
+*.a
+*.so
+*.tar.gz
+VERSION
+make.deps
+exemple/client
+exemple/client_iofunc
+exemple/client_stmt
