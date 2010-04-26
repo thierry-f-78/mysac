@@ -75,6 +75,30 @@ enum read_state {
 	RDST_DECODE_DATA
 };
 
+static inline
+int mysac_extend_res(MYSAC *m)
+{
+	MYSAC_RES *res = m->res;
+
+	if (res->extend_bloc_size == 0) {
+		m->errorcode = MYERR_BUFFER_OVERSIZE;
+		return MYSAC_RET_ERROR;
+	}
+	res = realloc(res, res->max_len + res->extend_bloc_size);
+	if (res == NULL) {
+		m->errorcode = MYERR_SYSTEM;
+		return MYSAC_RET_ERROR;
+	}
+	res->buffer = (char *)res->buffer - (char *)m->res + (char *)res;
+	res->buffer_len += res->extend_bloc_size;
+	res->max_len += res->extend_bloc_size;
+	m->read_len += res->extend_bloc_size;
+	m->read = (char *)m->read - (char *)m->res + (char *)res;
+	m->res = res;
+
+	return 0;
+}
+
 static int my_response(MYSAC *m) {
 	int i;
 	int err;
@@ -92,11 +116,12 @@ static int my_response(MYSAC *m) {
 
 	/* read length */
 	case RDST_READ_LEN:
+
 		/* check for avalaible size in buffer */
-		if (m->read_len < 4) {	
-			m->errorcode = MYERR_BUFFER_OVERSIZE;
-			return MYSAC_RET_ERROR;
-		}
+		while (m->read_len < 4)
+			if (mysac_extend_res(m) != 0)
+				return MYSAC_RET_ERROR;
+
 		err = mysac_read(m->fd, m->read + m->len,
 		                 4 - m->len, &errcode);
 		if (err == -1) {
@@ -122,11 +147,12 @@ static int my_response(MYSAC *m) {
 
 	/* read data */
 	case RDST_READ_DATA:
+
 		/* check for avalaible size in buffer */
-		if (m->read_len < m->packet_length) {	
-			m->errorcode = MYERR_BUFFER_OVERSIZE;
-			return MYSAC_RET_ERROR;
-		}	
+		while (m->read_len < m->packet_length)
+			if (mysac_extend_res(m) != 0)
+				return MYSAC_RET_ERROR;
+
 		err = mysac_read(m->fd, m->read + m->len,
 		                 m->packet_length - m->len, &errcode);
 		if (err == -1)
@@ -1179,10 +1205,10 @@ int mysac_send_query(MYSAC *mysac) {
 		/* prepare cols space */
 
 		/* check for avalaible size in buffer */
-		if (mysac->read_len < sizeof(MYSQL_FIELD) * res->nb_cols) {
-			mysac->errorcode = MYERR_BUFFER_OVERSIZE;
-			return mysac->errorcode;
-		}
+		while (mysac->read_len < sizeof(MYSQL_FIELD) * res->nb_cols)
+			if (mysac_extend_res(mysac) != 0)
+				return mysac->errorcode;
+
 		res->cols = (MYSQL_FIELD *)mysac->read;
 		mysac->read += sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 		mysac->read_len -= sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
@@ -1276,11 +1302,11 @@ int mysac_send_query(MYSAC *mysac) {
 	 */
 
 	/* check for avalaible size in buffer */
-	if (mysac->read_len < sizeof(MYSAC_ROWS) + ( res->nb_cols * (
-	                      sizeof(MYSAC_ROW) + sizeof(unsigned long) ) ) ) {
-		mysac->errorcode = MYERR_BUFFER_OVERSIZE;
-		return mysac->errorcode;
-	}
+	while (mysac->read_len < sizeof(MYSAC_ROWS) + ( res->nb_cols * (
+	                         sizeof(MYSAC_ROW) + sizeof(unsigned long) ) ) )
+		if (mysac_extend_res(mysac) != 0)
+			return mysac->errorcode;
+
 	mysac->read_len -= sizeof(MYSAC_ROWS) + ( res->nb_cols * (
 	                   sizeof(MYSAC_ROW) + sizeof(unsigned long) ) );
 
@@ -1307,10 +1333,10 @@ int mysac_send_query(MYSAC *mysac) {
 		case MYSQL_TYPE_TIMESTAMP:
 		case MYSQL_TYPE_DATETIME:
 		case MYSQL_TYPE_DATE:
-			if (mysac->read_len < sizeof(struct tm)) {
-				mysac->errorcode = MYERR_BUFFER_OVERSIZE;
-				return mysac->errorcode;
-			}
+			while (mysac->read_len < sizeof(struct tm))
+				if (mysac_extend_res(mysac) != 0)
+					return mysac->errorcode;
+
 			mysac->res->cr->data[i].tm = (struct tm *)mysac->read;
 			mysac->read += sizeof(struct tm);
 			mysac->read_len -= sizeof(struct tm);

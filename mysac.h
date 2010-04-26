@@ -199,6 +199,8 @@ typedef struct {
 	int nb_cols;
 	int nb_lines;
 	int nb_time;
+	int extend_bloc_size;
+	int max_len;
 	MYSQL_FIELD *cols;
 	struct mysac_list_head data;
 	MYSAC_ROWS *cr;
@@ -456,8 +458,35 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	res = (MYSAC_RES *)buffer;
 	res->nb_cols = 0;
 	res->nb_lines = 0;
+	res->extend_bloc_size = 0;
+	res->max_len = len;
 	res->buffer = buffer + sizeof(MYSAC_RES);
 	res->buffer_len = len - sizeof(MYSAC_RES);
+
+	return res;
+}
+
+/**
+ * Create new MYSAC_RES structur
+ * This function allocate memory
+ *
+ * @param chunk_size is the size allocated for the bloc
+ * @param extend if is true, the block is extended if the initial
+ *               memory does not enough. the extension size is the size
+ *               of chunk_size
+ */
+static inline
+MYSAC_RES *mysac_new_res(int chunk_size, int extend)
+{
+	MYSAC_RES *res;
+
+	res = malloc(chunk_size);
+	if (res == NULL)
+		return NULL;
+
+	mysac_init_res((char *)res, chunk_size);
+	if (extend)
+		res->extend_bloc_size = chunk_size;
 
 	return res;
 }
