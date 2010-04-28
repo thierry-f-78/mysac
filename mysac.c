@@ -1132,9 +1132,6 @@ int mysac_send_query(MYSAC *mysac) {
 	int errcode;
 	int i;
 	int len;
-	MYSAC_RES *res;
-
-	res = mysac->res;
 
 	switch (mysac->qst) {
 
@@ -1171,11 +1168,11 @@ int mysac_send_query(MYSAC *mysac) {
 
 	 */
 
-	res->nb_lines = 0;
-	res->cols = (MYSQL_FIELD *)(res->buffer + sizeof(MYSAC_RES));
-	INIT_LIST_HEAD(&res->data);
-	mysac->read = res->buffer;
-	mysac->read_len = res->buffer_len;
+	mysac->res->nb_lines = 0;
+	mysac->res->cols = (MYSQL_FIELD *)(mysac->res->buffer + sizeof(MYSAC_RES));
+	INIT_LIST_HEAD(&mysac->res->data);
+	mysac->read = mysac->res->buffer;
+	mysac->read_len = mysac->res->buffer_len;
 
 	case MYSAC_RECV_QUERY_COLNUM:
 		err = my_response(mysac);
@@ -1198,18 +1195,18 @@ int mysac_send_query(MYSAC *mysac) {
 		}
 
 		/* get nb col TODO: pas sur que ce soit un byte */
-		res->nb_cols = mysac->read[0];
+		mysac->res->nb_cols = mysac->read[0];
 		mysac->read_id = 0;
 		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
 	
 		/* prepare cols space */
 
 		/* check for avalaible size in buffer */
-		while (mysac->read_len < sizeof(MYSQL_FIELD) * res->nb_cols)
+		while (mysac->read_len < sizeof(MYSQL_FIELD) * mysac->res->nb_cols)
 			if (mysac_extend_res(mysac) != 0)
 				return mysac->errorcode;
 
-		res->cols = (MYSQL_FIELD *)mysac->read;
+		mysac->res->cols = (MYSQL_FIELD *)mysac->read;
 		mysac->read += sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 		mysac->read_len -= sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 
@@ -1248,7 +1245,7 @@ int mysac_send_query(MYSAC *mysac) {
 		fprintf(stderr, "\n");
 #endif
 		len = mysac_decode_field(mysac->read, mysac->packet_length,
-		                         &res->cols[mysac->read_id]);
+		                         &mysac->res->cols[mysac->read_id]);
 
 		if (len < 0) {
 			mysac->errorcode = len * -1;
@@ -1258,7 +1255,7 @@ int mysac_send_query(MYSAC *mysac) {
 		mysac->read_len += mysac->packet_length - len;
 
 		mysac->read_id++;
-		if (mysac->read_id < res->nb_cols)
+		if (mysac->read_id < mysac->res->nb_cols)
 			goto case_MYSAC_RECV_QUERY_COLDESC1;
 		
 		mysac->readst = 0;
@@ -1302,26 +1299,26 @@ int mysac_send_query(MYSAC *mysac) {
 	 */
 
 	/* check for avalaible size in buffer */
-	while (mysac->read_len < sizeof(MYSAC_ROWS) + ( res->nb_cols * (
+	while (mysac->read_len < sizeof(MYSAC_ROWS) + ( mysac->res->nb_cols * (
 	                         sizeof(MYSAC_ROW) + sizeof(unsigned long) ) ) )
 		if (mysac_extend_res(mysac) != 0)
 			return mysac->errorcode;
 
-	mysac->read_len -= sizeof(MYSAC_ROWS) + ( res->nb_cols * (
+	mysac->read_len -= sizeof(MYSAC_ROWS) + ( mysac->res->nb_cols * (
 	                   sizeof(MYSAC_ROW) + sizeof(unsigned long) ) );
 
 	/* reserve space for MYSAC_ROWS and add it into chained list */
-	res->cr = (MYSAC_ROWS *)mysac->read;
-	list_add_tail(&res->cr->link, &res->data);
+	mysac->res->cr = (MYSAC_ROWS *)mysac->read;
+	list_add_tail(&mysac->res->cr->link, &mysac->res->data);
 	mysac->read += sizeof(MYSAC_ROWS);
 
 	/* space for each field definition into row */
-	res->cr->data = (MYSAC_ROW *)mysac->read;
-	mysac->read += sizeof(MYSAC_ROW) * res->nb_cols;
+	mysac->res->cr->data = (MYSAC_ROW *)mysac->read;
+	mysac->read += sizeof(MYSAC_ROW) * mysac->res->nb_cols;
 
 	/* space for length table */
-	res->cr->lengths = (unsigned long *)mysac->read;
-	mysac->read += sizeof(unsigned long) * res->nb_cols;
+	mysac->res->cr->lengths = (unsigned long *)mysac->read;
+	mysac->read += sizeof(unsigned long) * mysac->res->nb_cols;
 
 	/* struct tm */
 	for (i=0; i<mysac->res->nb_cols; i++) {
@@ -1410,7 +1407,7 @@ int mysac_send_query(MYSAC *mysac) {
 			fprintf(stderr, "\n\n");
 #endif
 			len = mysac_decode_string_row(mysac->read, mysac->packet_length,
-			                              res, res->cr);
+			                              mysac->res, mysac->res->cr);
 			if (len < 0) {
 				mysac->errorcode = len * -1;
 				return mysac->errorcode;
@@ -1428,7 +1425,7 @@ int mysac_send_query(MYSAC *mysac) {
 			fprintf(stderr, "\n");
 #endif
 			len = mysac_decode_binary_row(mysac->read, mysac->packet_length,
-			                              res, res->cr);
+			                              mysac->res, mysac->res->cr);
 			if (len == -1) {
 				mysac->errorcode = MYERR_BINFIELD_CORRUPT;
 				return mysac->errorcode;
