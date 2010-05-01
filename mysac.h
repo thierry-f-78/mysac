@@ -470,6 +470,10 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
  * Create new MYSAC_RES structur
  * This function allocate memory
  *
+ * WARNING: If extend is set, you must use the function mysac_get_res
+ *          for retrieving the resource pointer after each call att
+ *          mysac_send_query.
+ *
  * @param chunk_size is the size allocated for the bloc
  * @param extend if is true, the block is extended if the initial
  *               memory does not enough. the extension size is the size
