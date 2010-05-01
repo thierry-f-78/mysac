@@ -11,7 +11,7 @@ char _q[BUFS];
 
 void usage(char *cmd) {
 	fprintf(stderr,
-		"usage: %s -h host -u login -p pass -d db {-|query}\n"
+		"usage: %s -h host -l login -p pass -d db {-|query}\n"
 		"  host  : \"path\" or \"<ip>:<port>\"\n"
 		"  login : database login\n"
 		"  pass  : database password\n"
