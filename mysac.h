@@ -369,11 +369,7 @@ int mysac_connect(MYSAC *mysac);
  *
  * @param mysac Should be the address of an existing MYSQL structure.
  */
-static inline
-void mysac_close(MYSAC *mysac) {
-	if (mysac->free_it == 1)
-		free(mysac);
-}
+void mysac_close(MYSAC *mysac);
 
 /**
  * This function return the mysql filedescriptor used for connection
@@ -383,10 +379,7 @@ void mysac_close(MYSAC *mysac) {
  *
  * @return mysql filedescriptor
  */
-static inline
-int mysac_get_fd(MYSAC *mysac) {
-	return mysac->fd;
-}
+int mysac_get_fd(MYSAC *mysac);
 
 /**
  * this function call the io function associated with the current
@@ -398,12 +391,7 @@ int mysac_get_fd(MYSAC *mysac) {
  *         mysac_send_database, mysac_send_query and mysac_connect or
  *    MYERR_BAD_STATE : the function does nothing to do (is an error)
  */
-static inline
-int mysac_io(MYSAC *mysac) {
-	if (mysac == NULL || mysac->call_it == NULL)
-		return MYERR_BAD_STATE;
-	return mysac->call_it(mysac);
-}
+int mysac_io(MYSAC *mysac);
 
 /**
  * Build use database message
@@ -447,24 +435,7 @@ int mysac_send_database(MYSAC *mysac);
  *
  * @return MYSAC_RES. this function cannot be fail
  */
-static inline
-MYSAC_RES *mysac_init_res(char *buffer, int len) {
-	MYSAC_RES *res;
-
-	/* check minimu length */
-	if ((unsigned int)len < sizeof(MYSAC_RES))
-		return NULL;
-
-	res = (MYSAC_RES *)buffer;
-	res->nb_cols = 0;
-	res->nb_lines = 0;
-	res->extend_bloc_size = 0;
-	res->max_len = len;
-	res->buffer = buffer + sizeof(MYSAC_RES);
-	res->buffer_len = len - sizeof(MYSAC_RES);
-
-	return res;
-}
+MYSAC_RES *mysac_init_res(char *buffer, int len);
 
 /**
  * Create new MYSAC_RES structur
@@ -479,21 +450,7 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
  *               memory does not enough. the extension size is the size
  *               of chunk_size
  */
-static inline
-MYSAC_RES *mysac_new_res(int chunk_size, int extend)
-{
-	MYSAC_RES *res;
-
-	res = malloc(chunk_size);
-	if (res == NULL)
-		return NULL;
-
-	mysac_init_res((char *)res, chunk_size);
-	if (extend)
-		res->extend_bloc_size = chunk_size;
-
-	return res;
-}
+MYSAC_RES *mysac_new_res(int chunk_size, int extend);
 
 /**
  * Initialize query
@@ -548,10 +505,7 @@ int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, int len);
  *
  * @return mysql response pointer
  */
-static inline
-MYSAC_RES *mysac_get_res(MYSAC *mysac) {
-	return mysac->res;
-}
+MYSAC_RES *mysac_get_res(MYSAC *mysac);
 
 /**
  * Send sql query command
@@ -647,10 +601,7 @@ int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id,
  *
  * @return 
  */
-static inline
-int mysac_send_stmt_execute(MYSAC *mysac) {
-	return mysac_send_query(mysac);
-}
+int mysac_send_stmt_execute(MYSAC *mysac);
 
 /**
  * After executing a statement with mysql_query() returns the number of rows
@@ -678,10 +629,7 @@ int mysac_affected_rows(MYSAC *mysac);
  *
  * @return number of columns
  */
-static inline
-unsigned int mysac_field_count(MYSAC_RES *res) {
-	return res->nb_cols;
-}
+unsigned int mysac_field_count(MYSAC_RES *res);
 
 /**
  * Returns the number of rows in the result set.
@@ -694,10 +642,7 @@ unsigned int mysac_field_count(MYSAC_RES *res) {
  *
  * @return The number of rows in the result set. 
  */
-static inline
-unsigned long mysac_num_rows(MYSAC_RES *res) {
-	return res->nb_lines;
-}
+unsigned long mysac_num_rows(MYSAC_RES *res);
 
 /**
  * Retrieves the next row of a result set. mysql_fetch_row() returns NULL when
@@ -716,37 +661,18 @@ unsigned long mysac_num_rows(MYSAC_RES *res) {
  * @return A MYSAC_ROW structure for the next row. NULL if there are no more
  * rows to retrieve or if an error occurred. 
  */
-static inline
-MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
-	if (res->cr == NULL)
-		res->cr = mysac_list_first_entry(&res->data, MYSAC_ROWS, link);
-	else
-		res->cr = mysac_list_next_entry(&res->cr->link, MYSAC_ROWS, link);
-	if (&res->data == &res->cr->link) {
-		res->cr = NULL;
-		return NULL;
-	}
-	return res->cr->data;
-}
+MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res);
 
 /**
  * Set pointer on the first row, you can exec mysac_fetch_row, return it the
  * first row;
  */
-static inline
-void mysac_first_row(MYSAC_RES *res) {
-	res->cr = NULL;
-}
+void mysac_first_row(MYSAC_RES *res);
 
 /**
  * Get current row, dont touch row ptr
  */
-static inline
-MYSAC_ROW *mysac_cur_row(MYSAC_RES *res) {
-	if (res->cr == NULL)
-		return NULL;
-	return res->cr->data;
-}
+MYSAC_ROW *mysac_cur_row(MYSAC_RES *res);
 
 /**
  * Returns the value generated for an AUTO_INCREMENT column by the previous
@@ -759,11 +685,7 @@ MYSAC_ROW *mysac_cur_row(MYSAC_RES *res) {
  *
  * @return the value generated for an AUTO_INCREMENT column
  */
-static inline
-unsigned long mysac_insert_id(MYSAC *m) {
-	return m->insert_id;
-}
-
+unsigned long mysac_insert_id(MYSAC *m);
 
 
 #if 0
@@ -838,10 +760,7 @@ int mysac_change_user(MYSAC *mysac, const char *user, const char *passwd,
  *
  * @param mysac Should be the address of an existing MYSQL structure.
  */
-static inline
-unsigned int mysac_errno(MYSAC *mysac) {
-	return mysac->errorcode;
-}
+unsigned int mysac_errno(MYSAC *mysac);
 
 /**
  * For the connection specified by mysql, mysql_error() returns a null-
@@ -852,10 +771,7 @@ unsigned int mysac_errno(MYSAC *mysac) {
  *
  * @param mysac Should be the address of an existing MYSQL structure.
  */
-static inline 
-const char *mysac_error(MYSAC *mysac) {
-	return mysac_errors[mysac->errorcode];
-}
+const char *mysac_error(MYSAC *mysac);
 
 /**
  * For the connection specified by mysql, mysql_error() returns a null-
@@ -866,15 +782,7 @@ const char *mysac_error(MYSAC *mysac) {
  *
  * @param mysac Should be the address of an existing MYSQL structure.
  */
-static inline 
-const char *mysac_advance_error(MYSAC *mysac) {
-	if (mysac->errorcode == MYERR_MYSQL_ERROR)
-		return mysac->mysql_error;
-	else if (mysac->errorcode == MYERR_SYSTEM)
-		return strerror(errno);
-	else
-		return mysac_errors[mysac->errorcode];
-}
+const char *mysac_advance_error(MYSAC *mysac);
 
 /*
 1607 ulong STDCALL

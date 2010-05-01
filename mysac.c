@@ -1556,3 +1556,110 @@ int mysac_send_query(MYSAC *mysac) {
 	return MYERR_BAD_STATE;
 }
 
+void mysac_close(MYSAC *mysac) {
+	if (mysac->free_it == 1)
+		free(mysac);
+}
+
+int mysac_get_fd(MYSAC *mysac) {
+	return mysac->fd;
+}
+
+int mysac_io(MYSAC *mysac) {
+	if (mysac == NULL || mysac->call_it == NULL)
+		return MYERR_BAD_STATE;
+	return mysac->call_it(mysac);
+}
+
+MYSAC_RES *mysac_init_res(char *buffer, int len) {
+	MYSAC_RES *res;
+
+	/* check minimu length */
+	if ((unsigned int)len < sizeof(MYSAC_RES))
+		return NULL;
+
+	res = (MYSAC_RES *)buffer;
+	res->nb_cols = 0;
+	res->nb_lines = 0;
+	res->extend_bloc_size = 0;
+	res->max_len = len;
+	res->buffer = buffer + sizeof(MYSAC_RES);
+	res->buffer_len = len - sizeof(MYSAC_RES);
+
+	return res;
+}
+
+MYSAC_RES *mysac_new_res(int chunk_size, int extend)
+{
+	MYSAC_RES *res;
+
+	res = malloc(chunk_size);
+	if (res == NULL)
+		return NULL;
+
+	mysac_init_res((char *)res, chunk_size);
+	if (extend)
+		res->extend_bloc_size = chunk_size;
+
+	return res;
+}
+
+MYSAC_RES *mysac_get_res(MYSAC *mysac) {
+	return mysac->res;
+}
+
+int mysac_send_stmt_execute(MYSAC *mysac) {
+	return mysac_send_query(mysac);
+}
+
+unsigned int mysac_field_count(MYSAC_RES *res) {
+	return res->nb_cols;
+}
+
+unsigned long mysac_num_rows(MYSAC_RES *res) {
+	return res->nb_lines;
+}
+
+MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
+	if (res->cr == NULL)
+		res->cr = mysac_list_first_entry(&res->data, MYSAC_ROWS, link);
+	else
+		res->cr = mysac_list_next_entry(&res->cr->link, MYSAC_ROWS, link);
+	if (&res->data == &res->cr->link) {
+		res->cr = NULL;
+		return NULL;
+	}
+	return res->cr->data;
+}
+
+void mysac_first_row(MYSAC_RES *res) {
+	res->cr = NULL;
+}
+
+MYSAC_ROW *mysac_cur_row(MYSAC_RES *res) {
+	if (res->cr == NULL)
+		return NULL;
+	return res->cr->data;
+}
+
+unsigned long mysac_insert_id(MYSAC *m) {
+	return m->insert_id;
+}
+
+unsigned int mysac_errno(MYSAC *mysac) {
+	return mysac->errorcode;
+}
+
+const char *mysac_error(MYSAC *mysac) {
+	return mysac_errors[mysac->errorcode];
+}
+
+const char *mysac_advance_error(MYSAC *mysac) {
+	if (mysac->errorcode == MYERR_MYSQL_ERROR)
+		return mysac->mysql_error;
+	else if (mysac->errorcode == MYERR_SYSTEM)
+		return strerror(errno);
+	else
+		return mysac_errors[mysac->errorcode];
+}
+
