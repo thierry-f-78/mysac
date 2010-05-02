@@ -201,6 +201,7 @@ typedef struct {
 	int nb_time;
 	int extend_bloc_size;
 	int max_len;
+	int do_free;
 	MYSQL_FIELD *cols;
 	struct mysac_list_head data;
 	MYSAC_ROWS *cr;

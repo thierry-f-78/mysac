@@ -1583,6 +1583,7 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	res->nb_lines = 0;
 	res->extend_bloc_size = 0;
 	res->max_len = len;
+	res->do_free = 0;
 	res->buffer = buffer + sizeof(MYSAC_RES);
 	res->buffer_len = len - sizeof(MYSAC_RES);
 
@@ -1600,13 +1601,15 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend)
 	mysac_init_res((char *)res, chunk_size);
 	if (extend)
 		res->extend_bloc_size = chunk_size;
+	res->do_free = 1;
 
 	return res;
 }
 
 void mysac_free_res(MYSAC_RES *r)
 {
-	free(r);
+	if(r->do_free == 1)
+		free(r);
 }
 
 MYSAC_RES *mysac_get_res(MYSAC *mysac) {
