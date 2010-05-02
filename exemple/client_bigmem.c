@@ -48,11 +48,10 @@ int main(int argc, char *argv[]) {
 	struct timeval start, stop, diff;
 	MYSAC my;
 	MYSAC_RES *r;
-	const char *host;
-	const char *login;
-	const char *pass;
-	const char *db;
-
+	const char *host = NULL;
+	const char *login = NULL;
+	const char *pass = NULL;
+	const char *db = NULL;
 
 	/* read cmd line */
 	for (i=1; i<argc; i++) {
@@ -72,6 +71,24 @@ int main(int argc, char *argv[]) {
 			i++;
 			db = argv[i];
 		}
+	}
+
+	/* check */
+	if (host == NULL) {
+		fprintf(stderr, "host expected\n");
+		usage(argv[0]);
+	}
+	if (login == NULL) {
+		fprintf(stderr, "login expected\n");
+		usage(argv[0]);
+	}
+	if (pass == NULL) {
+		fprintf(stderr, "password expected\n");
+		usage(argv[0]);
+	}
+	if (db == NULL) {
+		fprintf(stderr, "database expected\n");
+		usage(argv[0]);
 	}
 
 	/* check */
