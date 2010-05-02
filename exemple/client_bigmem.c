@@ -53,9 +53,6 @@ int main(int argc, char *argv[]) {
 	const char *pass;
 	const char *db;
 
-	/* check */
-//	if (argc != 10)
-//		usage(argv[0]);
 
 	/* read cmd line */
 	for (i=1; i<argc; i++) {
@@ -75,6 +72,12 @@ int main(int argc, char *argv[]) {
 			i++;
 			db = argv[i];
 		}
+	}
+
+	/* check */
+	if (argc != 10) {
+		fprintf(stderr, "query expected\n");
+		usage(argv[0]);
 	}
 
 	/* init memory */
