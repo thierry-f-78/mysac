@@ -1608,7 +1608,7 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend)
 
 void mysac_free_res(MYSAC_RES *r)
 {
-	if(r->do_free == 1)
+	if (r && r->do_free == 1)
 		free(r);
 }
 
