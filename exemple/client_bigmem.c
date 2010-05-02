@@ -183,8 +183,11 @@ int main(int argc, char *argv[]) {
 		diff.tv_usec += 1000000;
 	}
 
+	/* update resource */
+	r = mysac_get_res(&my);
+
 	/* display data */
-	dump_response(my.res);
+	dump_response(r);
 
 	printf("%lu rows in set (%d.%06d s)\n", mysac_num_rows(r),
 	       (int)diff.tv_sec, (int)diff.tv_usec);
