@@ -450,7 +450,7 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	MYSAC_RES *res;
 
 	/* check minimu length */
-	if (len < sizeof(MYSAC_RES))
+	if ((unsigned int)len < sizeof(MYSAC_RES))
 		return NULL;
 
 	res = (MYSAC_RES *)buffer;
