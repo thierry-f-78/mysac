@@ -453,6 +453,12 @@ MYSAC_RES *mysac_init_res(char *buffer, int len);
 MYSAC_RES *mysac_new_res(int chunk_size, int extend);
 
 /**
+ * Destroy MYSAC_RES structur
+ * This function free memory
+ */
+void mysac_free_res(MYSAC_RES *r);
+
+/**
  * Initialize query
  *
  * @param mysac Should be the address of an existing MYSAC structur.

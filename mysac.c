@@ -1604,6 +1604,11 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend)
 	return res;
 }
 
+void mysac_free_res(MYSAC_RES *r)
+{
+	free(r);
+}
+
 MYSAC_RES *mysac_get_res(MYSAC *mysac) {
 	return mysac->res;
 }
