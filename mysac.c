@@ -123,6 +123,22 @@ int mysac_extend_res(MYSAC *m)
 
 		/* update row names */
 		res->cols = (MYSQL_FIELD *)((char *)res->cols + offset);
+		for (i=0; i<res->nb_cols; i++) {
+			if (res->cols[i].name != NULL)
+				res->cols[i].name = res->cols[i].name + offset;
+			if (res->cols[i].org_name != NULL)
+				res->cols[i].org_name = res->cols[i].org_name + offset;
+			if (res->cols[i].table != NULL)
+				res->cols[i].table = res->cols[i].table + offset;
+			if (res->cols[i].org_table != NULL)
+				res->cols[i].org_table = res->cols[i].org_table + offset;
+			if (res->cols[i].db != NULL)
+				res->cols[i].db = res->cols[i].db + offset;
+			if (res->cols[i].catalog != NULL)
+				res->cols[i].catalog = res->cols[i].catalog + offset;
+			if (res->cols[i].def != NULL)
+				res->cols[i].def = res->cols[i].def + offset;
+		}
 
 		/* parcours la liste */
 		run = res->data.next;
