@@ -154,8 +154,9 @@ int mysac_extend_res(MYSAC *m)
 				case MYSQL_TYPE_MEDIUM_BLOB:
 				case MYSQL_TYPE_LONG_BLOB:
 				case MYSQL_TYPE_BLOB:
-					if (row->data[i].ptr != NULL)
-						row->data[i].blob = (char *)row->data[i].blob + offset;
+					if (row->data[i].string != NULL)
+						row->data[i].string = row->data[i].string + offset;
+					break;
 
 				/* do nothing for other types */
 				case MYSQL_TYPE_DECIMAL:
