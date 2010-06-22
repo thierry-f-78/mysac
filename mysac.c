@@ -174,6 +174,7 @@ int mysac_extend_res(MYSAC *m)
 				case MYSQL_TYPE_ENUM:
 				case MYSQL_TYPE_SET:
 				case MYSQL_TYPE_GEOMETRY:
+				default:
 					break;
 				}
 			}
