@@ -121,6 +121,9 @@ int mysac_extend_res(MYSAC *m)
 		res->data.prev = prev;
 		stop = &res->data;
 
+		/* update row names */
+		res->cols = (MYSQL_FIELD *)((char *)res->cols + offset);
+
 		/* parcours la liste */
 		run = res->data.next;
 		while (1) {
