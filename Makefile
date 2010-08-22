@@ -41,6 +41,7 @@ pack:
 	git clone . /tmp/mysac-$(BUILDVER) && \
 	echo "$(BUILDVER)" > VERSION; \
 	cp VERSION /tmp/mysac-$(BUILDVER); \
+	rm /tmp/mysac-$(BUILDVER)/.gitignore >/dev/null 2>&1; \
 	tar --exclude .git -C /tmp/ -vzcf mysac-$(BUILDVER).tar.gz mysac-$(BUILDVER) && \
 	rm -rf /tmp/mysac-$(BUILDVER) >/dev/null 2>&1; \
 
