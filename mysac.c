@@ -917,7 +917,12 @@ int mysac_send_stmt_prepare(MYSAC *mysac) {
 
 		/* 9-.. don't care ! */
 
-		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
+		if (mysac->nb_plhold > 0)
+			mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
+		else {
+			mysac->qst = MYSAC_RECV_QUERY_COLDESC2;
+			goto case_MYSAC_RECV_QUERY_COLDESC2;
+		}
 
 	/**********************************************************
 	*
