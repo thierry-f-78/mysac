@@ -151,7 +151,8 @@ enum {
 	MYERR_CONVDOUBLE,
 	MYERR_CONVTIME,
 	MYERR_CONVTIMESTAMP,
-	MYERR_CONVDATE
+	MYERR_CONVDATE,
+	MYERR_INVALID_EXPECT
 };
 
 extern const char *mysac_type[];
@@ -218,6 +219,19 @@ typedef struct mysac_bind {
 } MYSAC_BIND;
 
 /**
+ * This is the expected response type at a request
+ *
+ * If the request is "SELECT", the expected response is DATA
+ * and the data list must contain EOF paquet
+ *
+ * If the request is other, juste expect OK
+ */
+enum my_expected_response_t {
+	MYSAC_EXPECT_DATA = 0,
+	MYSAC_EXPECT_OK
+};
+
+/**
  * This contain the necessary for one mysql connection
  */
 typedef struct mysac {
@@ -260,6 +274,7 @@ typedef struct mysac {
 	unsigned int flags;
 
 	/* query */
+	enum my_expected_response_t expect;
 	enum my_query_st qst;
 	int read_id;
 	MYSAC_RES *res;
