@@ -788,7 +788,7 @@ int mysac_send_database(MYSAC *mysac) {
 	return MYERR_BAD_STATE;
 }
 
-int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
                              const char *request, int len) {
 
 	/* set packet number */
@@ -817,12 +817,12 @@ int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
 	return 0;
 }
 
-int mysac_s_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+int mysac_s_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
                              const char *request) {
 	return mysac_b_set_stmt_prepare(mysac, stmt_id, request, strlen(request));
 }
 
-int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
                              const char *fmt, va_list ap) {
 	int len;
 
@@ -850,7 +850,7 @@ int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
 	return 0;
 }
 
-int mysac_set_stmt_prepare(MYSAC *mysac, unsigned long *stmt_id,
+int mysac_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
                            const char *fmt, ...) {
 	va_list ap;
 
@@ -1070,7 +1070,7 @@ int mysac_send_stmt_prepare(MYSAC *mysac) {
 
 
 
-int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned long stmt_id,
+int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned int stmt_id,
                            MYSAC_BIND *values, int nb) {
 	int i;
 	int nb_bf;

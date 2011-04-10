@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
 	const char *login;
 	const char *pass;
 	const char *db;
-	unsigned long stmt_id;
+	unsigned int stmt_id;
 	MYSAC_BIND *vars;
 	int n;
 	char *error;
