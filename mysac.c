@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
 #include <mysql/mysql.h>
 #include <mysql/my_global.h>
 
@@ -414,19 +415,18 @@ MYSAC *mysac_new(int buffsize) {
 	char *buf;
 
 	/* struct memory */
-	m = malloc(sizeof(MYSAC));
+	m = calloc(1, sizeof(MYSAC));
 	if (m == NULL)
 		return NULL;
 
 	/* buff memory */
-	buf = malloc(buffsize);
+	buf = calloc(1, buffsize);
 	if (buf == NULL) {
 		free(m);
 		return NULL;
 	}
 
 	/* init */
-	memset(m, 0, sizeof(MYSAC));
 	m->free_it = 1;
 	m->qst = MYSAC_START;
 	m->buf = buf;
@@ -1707,7 +1707,7 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend)
 {
 	MYSAC_RES *res;
 
-	res = malloc(chunk_size);
+	res = calloc(1, chunk_size);
 	if (res == NULL)
 		return NULL;
 
