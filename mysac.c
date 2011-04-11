@@ -215,10 +215,7 @@ enum my_expected_response_t check_action(const char *request, int len) {
 	/* jump blank char '\r', '\n', '\t' and ' ' */
 	parse = request;
 	while (1) {
-		if (*parse != '\r' &&
-		    *parse != '\n' &&
-		    *parse != '\t' &&
-		    *parse != ' ')
+		if (!isspace(*parse))
 			break;
 
 		/* if no more chars in string */
