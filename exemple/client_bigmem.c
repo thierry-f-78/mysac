@@ -40,6 +40,12 @@ void usage(char *cmd) {
 	exit(1);
 }
 
+static inline void mysac_audit_fcn(void *arg, const char *fmt, va_list ap)
+{
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+}
+
 int main(int argc, char *argv[]) {
 	int ret_code;
 	int len;
@@ -112,6 +118,9 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	/* set memory dump function */
+	mysac_set_audit_fcn(&my, NULL, mysac_audit_fcn);
+
 	/* choose database */
 	mysac_set_database(&my, db);
 	while (1) {
@@ -153,7 +162,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* declare request */
-	r = mysac_new_res(1024, 1);
+	r = mysac_new_res(sizeof(MYSAC_RES), 1);
+	if (r == NULL) {
+		fprintf(stderr, "mysac_new_res failed\n");
+		exit(1);
+	}
 	mysac_b_set_query(&my, r, q, len);
 
 	/* get time */
