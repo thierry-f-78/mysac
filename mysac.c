@@ -301,7 +301,7 @@ static int my_response(MYSAC *m, enum my_expected_response_t expect) {
 	
 			/* unknown error */
 			else
-				m->errorcode = MYERR_UNKNOWN_ERROR;
+				m->errorcode = MYERR_PROTOCOL_ERROR;
 	
 			return MYSAC_RET_ERROR;
 		}
@@ -327,7 +327,7 @@ static int my_response(MYSAC *m, enum my_expected_response_t expect) {
 
 			/* not a sucess code */
 			if ((unsigned char)m->read[0] != 0) {
-				m->errorcode = MYERR_UNKNOWN_ERROR;
+				m->errorcode = MYERR_PROTOCOL_ERROR;
 				return MYSAC_RET_ERROR;
 			}
 
