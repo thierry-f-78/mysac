@@ -207,6 +207,34 @@ int mysac_extend_res(MYSAC *m)
 	return 0;
 }
 
+enum my_expected_response_t check_action(const char *request, int len) {
+
+	const char *parse;
+
+	/* jump blank char '\r', '\n', '\t' and ' ' */
+	parse = request;
+	while (1) {
+		if (*parse != '\r' &&
+		    *parse != '\n' &&
+		    *parse != '\t' &&
+		    *parse != ' ')
+			break;
+
+		/* if no more chars in string */
+		len--;
+		if (len <= 0)
+			return MYSAC_EXPECT_OK;
+
+		parse++;
+	}
+
+	/* check request type */
+	if ( (len > 6) && ( strncasecmp(parse, "SELECT", 5) == 0) )
+		return MYSAC_EXPECT_DATA;
+
+	return MYSAC_EXPECT_OK;
+}
+
 static int my_response(MYSAC *m, enum my_expected_response_t expect) {
 	int i;
 	int err;
@@ -817,10 +845,7 @@ int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
 	memcpy(&mysac->buf[5], request, len);
 
 	/* request type */
-	mysac->expect = MYSAC_EXPECT_OK;
-	if (len > 6)
-		if (strncasecmp(&mysac->buf[5], "SELECT", 5) == 0)
-			mysac->expect = MYSAC_EXPECT_DATA;
+	mysac->expect = check_action(&mysac->buf[5], len);
 
 	/* l */
 	to_my_3(len + 1, &mysac->buf[0]);
@@ -856,10 +881,7 @@ int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
 		return -1;
 
 	/* request type */
-	mysac->expect = MYSAC_EXPECT_OK;
-	if (len > 6)
-		if (strncasecmp(&mysac->buf[5], "SELECT", 5) == 0)
-			mysac->expect = MYSAC_EXPECT_DATA;
+	mysac->expect = check_action(&mysac->buf[5], len);
 
 	/* len */
 	to_my_3(len + 1, &mysac->buf[0]);
@@ -1227,10 +1249,7 @@ int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, int len) 
 	memcpy(&mysac->buf[5], query, len);
 
 	/* request type */
-	mysac->expect = MYSAC_EXPECT_OK;
-	if (len > 6)
-		if (strncasecmp(&mysac->buf[5], "SELECT", 5) == 0)
-			mysac->expect = MYSAC_EXPECT_DATA;
+	mysac->expect = check_action(&mysac->buf[5], len);
 	
 	/* unset statement result */
 	mysac->stmt_id = (void *)0;
@@ -1271,10 +1290,7 @@ int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap)
 	}
 
 	/* request type */
-	mysac->expect = MYSAC_EXPECT_OK;
-	if (len > 6)
-		if (strncasecmp(&mysac->buf[5], "SELECT", 5) == 0)
-			mysac->expect = MYSAC_EXPECT_DATA;
+	mysac->expect = check_action(&mysac->buf[5], len);
 
 	/* unset statement result */
 	mysac->stmt_id = (void *)0;
