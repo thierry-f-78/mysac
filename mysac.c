@@ -283,7 +283,7 @@ static int my_response(MYSAC *m, enum my_expected_response_t expect) {
 	case RDST_READ_DATA:
 
 		/* check for avalaible size in buffer */
-		while (m->read_len < m->packet_length)
+		while ((unsigned int)m->read_len < m->packet_length)
 			if (mysac_extend_res(m) != 0)
 				return MYSAC_RET_ERROR;
 
@@ -293,7 +293,7 @@ static int my_response(MYSAC *m, enum my_expected_response_t expect) {
 			return errcode;
 
 		m->len += err;
-		if (m->len < m->packet_length) {
+		if ((unsigned int)m->len < m->packet_length) {
 			m->errorcode = MYERR_WANT_READ;
 			return MYERR_WANT_READ;
 		}
@@ -835,7 +835,7 @@ int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
 	mysac->buf[4] = COM_STMT_PREPARE;
 
 	/* check len */
-	if (mysac->bufsize - 5 < len)
+	if (mysac->bufsize - 5 < (unsigned int)len)
 		return -1;
 
 	/* build sql query */
@@ -874,7 +874,7 @@ int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
 
 	/* build sql query */
 	len = vsnprintf(&mysac->buf[5], mysac->bufsize - 5, fmt, ap);
-	if (len >= mysac->bufsize - 5)
+	if ((unsigned int)len >= mysac->bufsize - 5)
 		return -1;
 
 	/* request type */
@@ -1126,8 +1126,8 @@ int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned int stmt_id,
 	int i;
 	int nb_bf;
 	int desc_off;
-	int vals_off;
-	int len = 3 + 1 + 1 + 4 + 1 + 4;
+	unsigned int vals_off;
+	unsigned int len = 3 + 1 + 1 + 4 + 1 + 4;
 	int ret;
 
 	/* check len */
@@ -1229,7 +1229,7 @@ int mysac_set_stmt_execute(MYSAC *mysac, MYSAC_RES *res, unsigned int stmt_id,
 }
 
 inline
-int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, int len) {
+int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, unsigned int len) {
 
 	/* set packet number */
 	mysac->buf[3] = 0;
@@ -1270,7 +1270,7 @@ int mysac_s_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query) {
 
 inline
 int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap) {
-	int len;
+	unsigned int len;
 
 	/* set packet number */
 	mysac->buf[3] = 0;
@@ -1395,11 +1395,11 @@ int mysac_send_query(MYSAC *mysac) {
 		mysac->res->nb_cols = mysac->read[0];
 		mysac->read_id = 0;
 		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
-	
+
 		/* prepare cols space */
 
 		/* check for avalaible size in buffer */
-		while (mysac->read_len < sizeof(MYSQL_FIELD) * mysac->res->nb_cols)
+		while ((unsigned int)mysac->read_len < sizeof(MYSQL_FIELD) * mysac->res->nb_cols)
 			if (mysac_extend_res(mysac) != 0)
 				return mysac->errorcode;
 
@@ -1496,7 +1496,7 @@ int mysac_send_query(MYSAC *mysac) {
 	 */
 
 	/* check for avalaible size in buffer */
-	while (mysac->read_len < sizeof(MYSAC_ROWS) + ( mysac->res->nb_cols * (
+	while ((unsigned int)mysac->read_len < sizeof(MYSAC_ROWS) + ( mysac->res->nb_cols * (
 	                         sizeof(MYSAC_ROW) + sizeof(unsigned long) ) ) )
 		if (mysac_extend_res(mysac) != 0)
 			return mysac->errorcode;
@@ -1527,7 +1527,7 @@ int mysac_send_query(MYSAC *mysac) {
 		case MYSQL_TYPE_TIMESTAMP:
 		case MYSQL_TYPE_DATETIME:
 		case MYSQL_TYPE_DATE:
-			while (mysac->read_len < sizeof(struct tm))
+			while ((unsigned int)mysac->read_len < sizeof(struct tm))
 				if (mysac_extend_res(mysac) != 0)
 					return mysac->errorcode;
 
