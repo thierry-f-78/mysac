@@ -102,6 +102,9 @@ int mysac_extend_res(MYSAC *m)
 		return MYSAC_RET_ERROR;
 	}
 
+	/* clear new memory */
+	memset((char *)res + res->max_len, 0, res->extend_bloc_size);
+
 	/* update lengths */
 	res->buffer_len += res->extend_bloc_size;
 	res->max_len += res->extend_bloc_size;
@@ -111,7 +114,8 @@ int mysac_extend_res(MYSAC *m)
 	if (res != m->res) {
 
 		/* compute offset between old and new memory bloc */
-		offset = *(unsigned long long int *)&res - *(unsigned long long int *)&m->res;
+		offset = (long long int)(*(unsigned long int *)&res) -
+		         (long long int)(*(unsigned long int *)&m->res);
 
 		/* update pointers */
 		res->buffer = (char *)((char *)res->buffer + offset);
@@ -1320,6 +1324,7 @@ int mysac_send_query(MYSAC *mysac) {
 	int errcode;
 	int i;
 	int len;
+	int nb_cols;
 
 	switch (mysac->qst) {
 
@@ -1395,18 +1400,20 @@ int mysac_send_query(MYSAC *mysac) {
 		}
 
 		/* get nb col TODO: pas sur que ce soit un byte */
-		mysac->res->nb_cols = mysac->read[0];
+		nb_cols = mysac->read[0];
 		mysac->read_id = 0;
 		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
 
 		/* prepare cols space */
 
 		/* check for avalaible size in buffer */
-		while ((unsigned int)mysac->read_len < sizeof(MYSQL_FIELD) * mysac->res->nb_cols)
+		while ((unsigned int)mysac->read_len < sizeof(MYSQL_FIELD) * nb_cols)
 			if (mysac_extend_res(mysac) != 0)
 				return mysac->errorcode;
 
+		mysac->res->nb_cols = nb_cols;
 		mysac->res->cols = (MYSQL_FIELD *)mysac->read;
+		memset((char *)mysac->res->cols, 0, sizeof(MYSQL_FIELD) * mysac->res->nb_cols);
 		mysac->read += sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 		mysac->read_len -= sizeof(MYSQL_FIELD) * mysac->res->nb_cols;
 
