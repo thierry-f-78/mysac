@@ -93,9 +93,6 @@ int mysac_extend_res(MYSAC *m)
 		return MYSAC_RET_ERROR;
 	}
 
-	mysac_print_audit(m, "mysac realloc memory: ptr=%p, from=%d to=%d",
-	                  m->res, res->max_len, res->max_len + res->extend_bloc_size);
-
 	res = realloc(m->res, res->max_len + res->extend_bloc_size);
 	if (res == NULL) {
 		m->errorcode = MYERR_SYSTEM;
@@ -104,6 +101,9 @@ int mysac_extend_res(MYSAC *m)
 
 	/* clear new memory */
 	memset((char *)res + res->max_len, 0, res->extend_bloc_size);
+
+	mysac_print_audit(m, "mysac realloc memory: from_ptr=%p, to_ptr=%p, from=%d to=%d",
+	                  m->res, res, res->max_len, res->max_len + res->extend_bloc_size);
 
 	/* update lengths */
 	res->buffer_len += res->extend_bloc_size;
