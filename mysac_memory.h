@@ -16,9 +16,18 @@
  * along with MySAC.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** @file */
+
 #ifndef __MYSAC_MEMORY_H__
 #define __MYSAC_MEMORY_H__
 
+/**
+ * This extend memory for containing complete response.
+ *
+ * @param mysac Should be the address of an existing MYSAC structure.
+ * 
+ * @return 0 if not error occured else return -1
+ */
 int mysac_extend_res(MYSAC *m);
 
 #endif

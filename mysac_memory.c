@@ -18,7 +18,6 @@
 
 #include "mysac.h"
 #include "mysac_utils.h"
-#include "mysac_decode_respbloc.h"
 
 int mysac_extend_res(MYSAC *m)
 {
@@ -33,13 +32,13 @@ int mysac_extend_res(MYSAC *m)
 
 	if (res->extend_bloc_size == 0) {
 		m->errorcode = MYERR_BUFFER_OVERSIZE;
-		return MYSAC_RET_ERROR;
+		return -1;
 	}
 
 	res = realloc(m->res, res->max_len + res->extend_bloc_size);
 	if (res == NULL) {
 		m->errorcode = MYERR_SYSTEM;
-		return MYSAC_RET_ERROR;
+		return -1;
 	}
 
 	/* clear new memory */
