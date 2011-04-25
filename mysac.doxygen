@@ -459,7 +459,7 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = mysac.h mysac_decode_field.h mysac_decode_row.h mysac_net.h mysac_utils.h
+INPUT                  = mysac_decode_field.h mysac_decode_respbloc.h mysac_decode_row.h mysac_encode_values.h mysac.h mysac_memory.h mysac_net.h mysac_utils.h
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 

@@ -37,16 +37,16 @@ enum mysac_decode_respbloc_t {
  * @param expect specifie is data is expected or boolean (ok)
  *
  * @return 
- *    Expected return values are:
- *    MYSAC_RET_OK if OK bloc is sent by mysql server. (only in mode MYSAC_EXPECT_OK)
- *    MYSAC_RET_EOF if EOF bloc is sent by mysql server (only in mode MYSAC_EXPECT_DATA)
- *    MYSAC_RET_DATA if DATA bloc is sent by mysql server (only in mode MYSAC_EXPECT_DATA)
- *    MYERR_WANT_READ if the library need more data on the network
- *
- *    Unexpected return values:
- *    MYSAC_RET_ERROR if technical error is occured (memory, protocol, ..) you can see
- *                    the error in the field "errorcode" of the mysac struct
- *    MYERR_SERVER_LOST if the serveur closed the connection
+ *    Expected return values are:<br />
+ *    MYSAC_RET_OK if OK bloc is sent by mysql server. (only in mode MYSAC_EXPECT_OK)<br />
+ *    MYSAC_RET_EOF if EOF bloc is sent by mysql server (only in mode MYSAC_EXPECT_DATA)<br />
+ *    MYSAC_RET_DATA if DATA bloc is sent by mysql server (only in mode MYSAC_EXPECT_DATA)<br />
+ *    MYERR_WANT_READ if the library need more data on the network<br />
+ *    <br />
+ *    Unexpected return values:<br />
+ *    MYSAC_RET_ERROR if technical error is occured (memory, protocol, ..) you can see<br />
+ *                    the error in the field "errorcode" of the mysac struct<br />
+ *    MYERR_SERVER_LOST if the serveur closed the connection<br />
  */
 int mysac_decode_respbloc(MYSAC *m, enum my_expected_response_t expect);
 

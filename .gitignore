@@ -7,3 +7,6 @@ make.deps
 exemple/client
 exemple/client_iofunc
 exemple/client_stmt
+exemple/client_bigmem
+html/
+man/
