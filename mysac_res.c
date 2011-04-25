@@ -17,6 +17,7 @@
  */
 
 #include "mysac.h"
+#include "mysac_memory.h"
 
 MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	MYSAC_RES *res;
@@ -41,7 +42,7 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend)
 {
 	MYSAC_RES *res;
 
-	res = calloc(1, chunk_size);
+	res = mysac_calloc(1, chunk_size);
 	if (res == NULL)
 		return NULL;
 
@@ -57,7 +58,7 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend)
 void mysac_free_res(MYSAC_RES *r)
 {
 	if (r && r->do_free == 1)
-		free(r);
+		mysac_free(r);
 }
 
 MYSAC_RES *mysac_get_res(MYSAC *mysac) {

@@ -16,8 +16,37 @@
  * along with MySAC.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
+
 #include "mysac.h"
 #include "mysac_utils.h"
+
+void *mysac_calloc(size_t nmemb, size_t size)
+{
+#ifdef USE_MALLOC
+	return calloc(nmemb, size);
+#else
+	return NULL;
+#endif
+}
+
+void mysac_free(void *ptr)
+{
+#ifdef USE_MALLOC
+	return free(ptr);
+#else
+	return;
+#endif
+}
+
+void *mysac_realloc(void *ptr, size_t size)
+{
+#ifdef USE_MALLOC
+	return realloc(ptr, size);
+#else
+	return NULL;
+#endif
+}
 
 int mysac_extend_res(MYSAC *m)
 {
@@ -35,7 +64,7 @@ int mysac_extend_res(MYSAC *m)
 		return -1;
 	}
 
-	res = realloc(m->res, res->max_len + res->extend_bloc_size);
+	res = mysac_realloc(m->res, res->max_len + res->extend_bloc_size);
 	if (res == NULL) {
 		m->errorcode = MYERR_SYSTEM;
 		return -1;

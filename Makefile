@@ -28,7 +28,7 @@ MYSQL_INC := /usr/include/mysql
 # and use "VERSION" file if unknown.
 BUILDVER := $(shell ./mysac_ver)
 
-CFLAGS = -DBUILDVER=$(BUILDVER) -I$(MYSQL_INC) -O0 -g -Wall -Werror -fpic
+CFLAGS = -DBUILDVER=$(BUILDVER) -DUSE_MALLOC -I$(MYSQL_INC) -O0 -g -Wall -Werror -fpic
 LDFLAGS = -g -L$(MYSQL_LIB) -lmysqlclient_r
 
 OBJS = \

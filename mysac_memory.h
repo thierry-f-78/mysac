@@ -30,4 +30,8 @@
  */
 int mysac_extend_res(MYSAC *m);
 
+void *mysac_calloc(size_t nmemb, size_t size);
+void *mysac_realloc(void *ptr, size_t size);
+void mysac_free(void *ptr);
+
 #endif

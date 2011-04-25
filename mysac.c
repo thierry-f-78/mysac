@@ -78,12 +78,12 @@ MYSAC *mysac_new(int buffsize) {
 	char *buf;
 
 	/* struct memory */
-	m = calloc(1, sizeof(MYSAC));
+	m = mysac_calloc(1, sizeof(MYSAC));
 	if (m == NULL)
 		return NULL;
 
 	/* buff memory */
-	buf = calloc(1, buffsize);
+	buf = mysac_calloc(1, buffsize);
 	if (buf == NULL) {
 		free(m);
 		return NULL;
