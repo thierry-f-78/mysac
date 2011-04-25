@@ -16,10 +16,14 @@
  * along with MySAC.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** @file */
+
 #ifndef __MYSAC_UTILS_H__
 #define __MYSAC_UTILS_H__
 
 #include <stdint.h>
+
+#include <mysql/my_global.h>
 
 #include "mysac.h"
 
@@ -245,5 +249,7 @@ static inline void mysac_print_audit(MYSAC *mysac, const char *fmt, ...) {
 
 	mysac->ma(mysac->ma_arg, fmt, ap);
 }
+
+enum my_expected_response_t check_action(const char *request, int len);
 
 #endif

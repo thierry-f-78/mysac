@@ -31,7 +31,21 @@ BUILDVER := $(shell ./mysac_ver)
 CFLAGS = -DBUILDVER=$(BUILDVER) -I$(MYSQL_INC) -O0 -g -Wall -Werror -fpic
 LDFLAGS = -g -L$(MYSQL_LIB) -lmysqlclient_r
 
-OBJS = mysac.o mysac_net.o mysac_decode_field.o mysac_decode_row.o mysac_encode_values.o mysac_errors.o
+OBJS = \
+	mysac.o \
+	mysac_net.o \
+	mysac_utils.o \
+	mysac_res.o \
+	mysac_decode_field.o \
+	mysac_decode_row.o \
+	mysac_encode_values.o \
+	mysac_errors.o \
+	mysac_decode_respbloc.o \
+	mysac_memory.o \
+	mysac_connect.o \
+	mysac_stmt.o \
+	mysac_query.o \
+	mysac_usedatabase.o
 
 build: make.deps
 	$(MAKE) lib
