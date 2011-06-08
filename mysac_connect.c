@@ -216,7 +216,7 @@ int mysac_connect(MYSAC *mysac) {
 		MYSAC_RET_ERROR,
 		MYSAC_RET_DATA
 	*/
-		err = mysac_decode_respbloc(mysac, MYSAC_EXPECT_OK);
+		err = mysac_decode_respbloc(mysac, MYSAC_EXPECT_BOTH);
 
 		if (err == MYERR_WANT_READ)
 			return MYERR_WANT_READ;
