@@ -334,6 +334,10 @@ void mysac_init(MYSAC *mysac, char *buffer, unsigned int buffsize);
  * can execute any other API functions that require a valid MYSQL connection
  * handle structure.
  *
+ * Warning: the configuration parameters "my_addr", "user", "passwd" and "db"
+ * must be stay accessible and unchanged in memory until the execution of
+ * "mysac_close".
+ *
  * @param mysac The first parameter should be the address of an existing MYSQL
  *        structure. Before calling mysql_real_connect() you must call
  *        mysql_init() to initialize the MYSQL structure. You can change a lot
