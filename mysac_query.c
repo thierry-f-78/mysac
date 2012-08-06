@@ -97,6 +97,7 @@ int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap)
 	mysac->len = len + 5;
 	mysac->qst = MYSAC_SEND_QUERY;
 	mysac->call_it = mysac_send_query;
+	mysac->errorcode = 0;
 
 	return 0;
 }
