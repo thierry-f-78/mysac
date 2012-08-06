@@ -246,8 +246,8 @@ static inline void mysac_print_audit(MYSAC *mysac, const char *fmt, ...) {
 		return;
 
 	va_start(ap, fmt);
-
 	mysac->ma(mysac->ma_arg, fmt, ap);
+	va_end(ap);
 }
 
 enum my_expected_response_t check_action(const char *request, int len);

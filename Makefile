@@ -18,7 +18,7 @@
 SHELL=/bin/bash
 # Mysql lib directory
 # exemple: <path>/mysql-5.1.41/libmysql_r/.libs
-MYSQL_LIB := /usr/lib
+MYSQL_LIB := /usr/lib/mysql
 
 # Mysql include directory
 # exemple: <path>/mysql-5.1.41/include
