@@ -160,6 +160,12 @@ int mysac_decode_respbloc(MYSAC *m, enum my_expected_response_t expect) {
 				/* server warnings */
 				m->warnings = uint2korr(read);
 
+				/* copy va	lues into resource */
+				if (m->res != NULL) {
+					m->res->affected_rows = m->affected_rows;
+					m->res->insert_id     = m->insert_id;
+					m->res->warnings      = m->warnings;
+				}
 				return MYSAC_RET_OK;
 			}
 		}
