@@ -71,6 +71,7 @@ void mysac_init(MYSAC *mysac, char *buffer, unsigned int buffsize) {
 	mysac->qst = MYSAC_START;
 	mysac->buf = buffer;
 	mysac->bufsize = buffsize;
+	INIT_LIST_HEAD(&mysac->all_res);
 }
 
 MYSAC *mysac_new(int buffsize) {

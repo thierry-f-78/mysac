@@ -152,7 +152,8 @@ enum {
 	MYERR_CONVTIME,
 	MYERR_CONVTIMESTAMP,
 	MYERR_CONVDATE,
-	MYERR_INVALID_EXPECT
+	MYERR_INVALID_EXPECT,
+	MYERR_NO_RES,
 };
 
 extern const char *mysac_type[];
@@ -195,6 +196,7 @@ typedef struct {
  * This contain the complete result of one request
  */
 typedef struct {
+	struct mysac_list_head list;
 	char *buffer;
 	int buffer_len;
 	int nb_cols;
@@ -293,6 +295,7 @@ typedef struct mysac {
 	enum my_query_st qst;
 	int read_id;
 	MYSAC_RES *res;
+	struct mysac_list_head all_res;
 	unsigned int *stmt_id;
 
 	/* the buffer */
@@ -508,10 +511,42 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend);
 void mysac_free_res(MYSAC_RES *r);
 
 /**
- * Initialize query
+ * Add resource to mysac struct. This resource can by used for store
+ * the response. You can add more than one ressource for multireponse
+ * requests. exemple:
+ *
+ *    CREATE PROCEDURE test ( )
+ *    main:BEGIN
+ *       SELECT 0 AS "table1_col1";
+ *       SELECT 1 AS "table2_col1";
+ *       SELECT 2 AS "table3_col1";
+ *    END
+ *
+ * and:
+ *
+ *    CALL test()
+ *
+ * You must to delete resource with "mysac_del_res" after the request.
  *
  * @param mysac Should be the address of an existing MYSAC structur.
  * @param res Should be the address of an existing MYSAC_RES structur.
+ */
+void mysac_add_res(MYSAC *mysac, MYSAC_RES *res);
+
+/**
+ * remove resource form available resources list. This function does not 
+ * free the resource, just remove it.
+ *
+ * @param res is the resource to delete from list.
+ */
+void mysac_del_res(MYSAC_RES *res);
+
+/**
+ * Initialize query
+ *
+ * @param mysac Should be the address of an existing MYSAC structur.
+ * @param res Should be the address of an existing MYSAC_RES structur,
+ *            or must be NULL if mysac_add_res is used previously.
  * @param fmt is the output format with the printf style
  *
  * @return 0: ok, -1 nok
@@ -522,7 +557,8 @@ int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...);
  * Initialize query
  *
  * @param mysac Should be the address of an existing MYSAC structur.
- * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param res Should be the address of an existing MYSAC_RES structur,
+ *            or must be NULL if mysac_add_res is used previously.
  * @param fmt is the output format with the printf style
  * @param ap is the argument list on format vprintf
  *
@@ -534,7 +570,8 @@ int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap)
  * Initialize query
  *
  * @param mysac Should be the address of an existing MYSAC structur.
- * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param res Should be the address of an existing MYSAC_RES structur,
+ *            or must be NULL if mysac_add_res is used previously.
  * @param query is a string (terminated by \0) containing the query
  *
  * @return 0: ok, -1 nok
@@ -545,7 +582,8 @@ int mysac_s_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query);
  * Initialize query
  *
  * @param mysac Should be the address of an existing MYSAC structur.
- * @param res Should be the address of an existing MYSAC_RES structur.
+ * @param res Should be the address of an existing MYSAC_RES structur,
+ *            or must be NULL if mysac_add_res is used previously.
  * @param query is a string containing the query
  * @param len is the len of the query
  *
@@ -561,6 +599,39 @@ int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, unsigned 
  * @return mysql response pointer
  */
 MYSAC_RES *mysac_get_res(MYSAC *mysac);
+
+/**
+ * This function return the first resource avalaible
+ *
+ * @param mysac Should be the address of an existing MYSAC structure.
+ *
+ * @return resource or NULL if no resource avalaible
+ */
+MYSAC_RES *mysac_get_first_res(MYSAC *mysac);
+
+/**
+ * this fucntion return the next resource avalaible. If you delete
+ * the last resource, this function can not be use.
+ *
+ * You can parse the resource with two méthods:
+ *
+ *    for (res = mysac_get_first_res(mysac);
+ *         res != NULL;
+ *         res = mysac_get_next_res(mysac, res))
+ *
+ * Or, if you want do delete resources
+ *
+ *    while ((res == mysac_get_first_res(mysac)) != NULL) {
+ *       mysac_res_del(res)
+ *       ...
+ *    }
+ *
+ * @param mysac Should be the address of an existing MYSAC structure.
+ * @param last is the last resource avalaible.
+ *
+ * @return resource or NULL if no more resource avalaible
+ */
+MYSAC_RES *mysac_get_next_res(MYSAC *mysac, MYSAC_RES *last);
 
 /**
  * Send sql query command

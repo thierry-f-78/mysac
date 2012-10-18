@@ -50,8 +50,18 @@ int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, unsigned 
 	/* len */
 	to_my_3(len + 1, &mysac->buf[0]);
 
+	/* add resource */
+	if (res != NULL)
+		mysac->res = res;
+	else {
+		mysac->res = mysac_get_first_res(mysac);
+		if (mysac->res == NULL) {
+			mysac->errorcode = MYERR_NO_RES;
+			return -1;
+		}
+	}
+
 	/* send params */
-	mysac->res = res;
 	mysac->send = mysac->buf;
 	mysac->len = len + 5;
 	mysac->qst = MYSAC_SEND_QUERY;
@@ -91,8 +101,18 @@ int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap)
 	/* len */
 	to_my_3(len + 1, &mysac->buf[0]);
 
+	/* add resource */
+	if (res != NULL)
+		mysac->res = res;
+	else {
+		mysac->res = mysac_get_first_res(mysac);
+		if (mysac->res == NULL) {
+			mysac->errorcode = MYERR_NO_RES;
+			return -1;
+		}
+	}
+
 	/* send params */
-	mysac->res = res;
 	mysac->send = mysac->buf;
 	mysac->len = len + 5;
 	mysac->qst = MYSAC_SEND_QUERY;

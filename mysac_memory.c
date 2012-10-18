@@ -182,6 +182,10 @@ int mysac_extend_res(MYSAC *m)
 		run = run->next;
 	}
 
+	/* update neighbor list link */
+	res->list.prev->next = &res->list;
+	res->list.next->prev = &res->list;
+
 	/* update resource pointer */
 	m->res = res;
 

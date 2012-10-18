@@ -18,6 +18,7 @@
 
 #include "mysac.h"
 #include "mysac_memory.h"
+#include "mysac_utils.h"
 
 MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	MYSAC_RES *res;
@@ -34,6 +35,7 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	res->do_free = 0;
 	res->buffer = buffer + sizeof(MYSAC_RES);
 	res->buffer_len = len - sizeof(MYSAC_RES);
+	INIT_LIST_HEAD(&res->list);
 
 	return res;
 }
@@ -55,6 +57,16 @@ MYSAC_RES *mysac_new_res(int chunk_size, int extend)
 	return res;
 }
 
+void mysac_add_res(MYSAC *mysac, MYSAC_RES *res)
+{
+	list_add_tail(&res->list, &mysac->all_res);
+}
+
+void mysac_del_res(MYSAC_RES *res)
+{
+	list_del(&res->list);
+}
+
 void mysac_free_res(MYSAC_RES *r)
 {
 	if (r && r->do_free == 1)
@@ -63,6 +75,18 @@ void mysac_free_res(MYSAC_RES *r)
 
 MYSAC_RES *mysac_get_res(MYSAC *mysac) {
 	return mysac->res;
+}
+
+MYSAC_RES *mysac_get_first_res(MYSAC *mysac) {
+	if (mysac->all_res.next == &mysac->all_res)
+		return NULL;
+	return mysac_list_first_entry(&mysac->all_res, MYSAC_RES, list);
+}
+
+MYSAC_RES *mysac_get_next_res(MYSAC *mysac, MYSAC_RES *last) {
+	if (last->list.next == &mysac->all_res)
+		return NULL;
+	return mysac_list_next_entry(&last->list, MYSAC_RES, list);
 }
 
 unsigned int mysac_field_count(MYSAC_RES *res) {
