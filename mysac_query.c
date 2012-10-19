@@ -213,6 +213,9 @@ int mysac_send_query(MYSAC *mysac) {
 		mysac->read_id = 0;
 		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
 
+		/* reset resource */
+		mysac_reset_res(mysac->res);
+
 		/* prepare cols space */
 
 		/* check for avalaible size in buffer */
