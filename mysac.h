@@ -490,6 +490,15 @@ int mysac_send_database(MYSAC *mysac);
 MYSAC_RES *mysac_init_res(char *buffer, int len);
 
 /**
+ * This function reset resource. Keep the buffer, the
+ * length, the free status and the allocation bloc size
+ * but remove response lines and columns.
+ *
+ * @param res Should be the address of an existing MYSAC_RES structur.
+ */
+void mysac_reset_res(MYSAC_RES *res);
+
+/**
  * Create new MYSAC_RES structur
  * This function allocate memory
  *

@@ -20,6 +20,14 @@
 #include "mysac_memory.h"
 #include "mysac_utils.h"
 
+inline
+void mysac_reset_res(MYSAC_RES *res) {
+	res->nb_cols = 0;
+	res->nb_lines = 0;
+	INIT_LIST_HEAD(&res->data);
+}
+
+inline
 MYSAC_RES *mysac_init_res(char *buffer, int len) {
 	MYSAC_RES *res;
 
@@ -28,14 +36,14 @@ MYSAC_RES *mysac_init_res(char *buffer, int len) {
 		return NULL;
 
 	res = (MYSAC_RES *)buffer;
-	res->nb_cols = 0;
-	res->nb_lines = 0;
 	res->extend_bloc_size = 0;
 	res->max_len = len;
 	res->do_free = 0;
 	res->buffer = buffer + sizeof(MYSAC_RES);
 	res->buffer_len = len - sizeof(MYSAC_RES);
 	INIT_LIST_HEAD(&res->list);
+
+	mysac_reset_res(res);
 
 	return res;
 }
@@ -98,14 +106,27 @@ unsigned long mysac_num_rows(MYSAC_RES *res) {
 }
 
 MYSAC_ROW *mysac_fetch_row(MYSAC_RES *res) {
+
+	/* empty list */
+	if (res->data.next == &res->data) {
+		res->cr = NULL;
+		return NULL;
+	}
+
+	/* start list */
 	if (res->cr == NULL)
 		res->cr = mysac_list_first_entry(&res->data, MYSAC_ROWS, link);
+
+	/* next item */
 	else
 		res->cr = mysac_list_next_entry(&res->cr->link, MYSAC_ROWS, link);
+
+	/* last item */
 	if (&res->data == &res->cr->link) {
 		res->cr = NULL;
 		return NULL;
 	}
+
 	return res->cr->data;
 }
 
