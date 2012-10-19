@@ -24,22 +24,14 @@
 #include "mysac_decode_field.h"
 #include "mysac_decode_row.h"
 
-inline
-int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, unsigned int len) {
+static inline
+int mysac_set_query_params(MYSAC *mysac, MYSAC_RES *res, int len) {
 
 	/* set packet number */
 	mysac->buf[3] = 0;
 
 	/* set mysql command */
 	mysac->buf[4] = COM_QUERY;
-
-	/* build sql query */
-	if (mysac->bufsize - 5 < len) {
-		mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
-		mysac->len = 0;
-		return -1;
-	}
-	memcpy(&mysac->buf[5], query, len);
 
 	/* request type */
 	mysac->expect = check_action(&mysac->buf[5], len);
@@ -68,6 +60,21 @@ int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, unsigned 
 	mysac->call_it = mysac_send_query;
 
 	return 0;
+}
+
+inline
+int mysac_b_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query, unsigned int len) {
+
+	/* build sql query */
+	if (mysac->bufsize - 5 < len) {
+		mysac->errorcode = MYERR_BUFFER_TOO_SMALL;
+		mysac->len = 0;
+		return -1;
+	}
+	memcpy(&mysac->buf[5], query, len);
+
+	/* build request */
+	return mysac_set_query_params(mysac, res, len);
 }
 
 int mysac_s_set_query(MYSAC *mysac, MYSAC_RES *res, const char *query) {
@@ -78,12 +85,6 @@ inline
 int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap) {
 	unsigned int len;
 
-	/* set packet number */
-	mysac->buf[3] = 0;
-
-	/* set mysql command */
-	mysac->buf[4] = COM_QUERY;
-
 	/* build sql query */
 	len = vsnprintf(&mysac->buf[5], mysac->bufsize - 5, fmt, ap);
 	if (len >= mysac->bufsize - 5) {
@@ -92,33 +93,7 @@ int mysac_v_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, va_list ap)
 		return -1;
 	}
 
-	/* request type */
-	mysac->expect = check_action(&mysac->buf[5], len);
-
-	/* unset statement result */
-	mysac->stmt_id = (void *)0;
-
-	/* len */
-	to_my_3(len + 1, &mysac->buf[0]);
-
-	/* add resource */
-	if (res != NULL)
-		mysac->res = res;
-	else {
-		mysac->res = mysac_get_first_res(mysac);
-		if (mysac->res == NULL) {
-			mysac->errorcode = MYERR_NO_RES;
-			return -1;
-		}
-	}
-
-	/* send params */
-	mysac->send = mysac->buf;
-	mysac->len = len + 5;
-	mysac->qst = MYSAC_SEND_QUERY;
-	mysac->call_it = mysac_send_query;
-
-	return 0;
+	return mysac_set_query_params(mysac, res, len);
 }
 
 int mysac_set_query(MYSAC *mysac, MYSAC_RES *res, const char *fmt, ...) {
