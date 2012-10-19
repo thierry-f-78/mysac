@@ -187,7 +187,7 @@ int mysac_decode_respbloc(MYSAC *m, enum my_expected_response_t expect) {
 		}
 
 		/* the expect code is not valid */
-		m->errorcode = MYERR_UNKNOWN_ERROR;
+		m->errorcode = MYERR_INVALID_EXPECT;
 		return MYSAC_RET_ERROR;
 
 	default:
