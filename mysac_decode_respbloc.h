@@ -23,6 +23,8 @@
 
 #include "mysac.h"
 
+#define RESPONSE_MULTI_RESULTS 0x0008
+
 enum mysac_decode_respbloc_t {
 	MYSAC_RET_EOF = 1000,
 	MYSAC_RET_OK,

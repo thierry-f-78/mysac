@@ -23,6 +23,10 @@
 #include "mysac_utils.h"
 #include "mysac_decode_respbloc.h"
 
+#define MYSAC_CLIENT_MULTI_STATEMENTS 0x01 /* Enable/disable multi-stmt support */
+#define MYSAC_CLIENT_MULTI_RESULTS    0x02 /* Enable/disable multi-results */
+
+
 int mysac_connect(MYSAC *mysac) {
 	int err;
 	int errcode;
@@ -138,7 +142,7 @@ int mysac_connect(MYSAC *mysac) {
 		to_my_2(mysac->flags, &mysac->buf[4]);
 
 		/* set extended options */
-		to_my_2(0, &mysac->buf[6]);
+		to_my_2(MYSAC_CLIENT_MULTI_RESULTS, &mysac->buf[6]);
 
 		/* max m->bufs */
 		to_my_4(0x40000000, &mysac->buf[8]);

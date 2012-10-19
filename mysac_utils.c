@@ -42,6 +42,9 @@ enum my_expected_response_t check_action(const char *request, int len)
 	if ( (len > 6) && ( strncasecmp(parse, "SELECT", 5) == 0) )
 		return MYSAC_EXPECT_DATA;
 
+	else if ( (len > 5) && ( strncasecmp(parse, "CALL", 4) == 0) )
+		return MYSAC_EXPECT_DATA;
+
 	return MYSAC_EXPECT_OK;
 }
 

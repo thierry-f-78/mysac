@@ -134,6 +134,7 @@ int mysac_send_query(MYSAC *mysac) {
 	int i;
 	int len;
 	int nb_cols;
+	MYSAC_RES *previous_res;
 
 	switch (mysac->qst) {
 
@@ -152,14 +153,23 @@ int mysac_send_query(MYSAC *mysac) {
 		mysac->send += err;
 		if (mysac->len > 0)
 			return MYERR_WANT_WRITE;
-		mysac->qst = MYSAC_RECV_QUERY_COLNUM;
-		mysac->readst = 0;
+
+		/* prepare first resource */
+		mysac->read = mysac->res->buffer;
+		mysac->read_len = mysac->res->buffer_len;
+
+		/* reset protocol response flags */
+		mysac->status = 0;
 
 	/**********************************************************
 	*
 	* receive
 	*
 	**********************************************************/
+
+	case_MYSAC_RECV_QUERY_COLNUM:
+	mysac->qst = MYSAC_RECV_QUERY_COLNUM;
+	mysac->readst = 0;
 
 	/* prepare struct
 
@@ -170,21 +180,64 @@ int mysac_send_query(MYSAC *mysac) {
 
 	 */
 
-	mysac->res->nb_lines = 0;
-	mysac->res->cols = (MYSQL_FIELD *)(mysac->res->buffer + sizeof(MYSAC_RES));
-	INIT_LIST_HEAD(&mysac->res->data);
-	mysac->read = mysac->res->buffer;
-	mysac->read_len = mysac->res->buffer_len;
-
 	case MYSAC_RECV_QUERY_COLNUM:
-		err = mysac_decode_respbloc(mysac, mysac->expect);
 
-		if (err == MYERR_WANT_READ)
-			return MYERR_WANT_READ;
+		/* if the last EOF return RESPONSE_MULTI_RESULTS flag, 
+		 * expect data or ok. This use previous resource.
+		 */
+		if (mysac->status & RESPONSE_MULTI_RESULTS) {
+			err = mysac_decode_respbloc(mysac, MYSAC_EXPECT_BOTH);
 
-		/* error */
-		if (err == MYSAC_RET_ERROR)
-			return mysac->errorcode;
+			/* want read */
+			if (err == MYERR_WANT_READ)
+				return MYERR_WANT_READ;
+
+			/* error */
+			if (err == MYSAC_RET_ERROR)
+				return mysac->errorcode;
+
+			/* end of request */
+			if (err == MYSAC_RET_OK)
+				return 0;
+
+			/* remember last resource */
+			previous_res = mysac->res;
+
+			/* use next resource */
+			if (mysac->all_res.next != &mysac->all_res)
+				mysac->res = mysac_get_next_res(mysac, mysac->res);
+			if (mysac->res == NULL) {
+				mysac->res = mysac_get_first_res(mysac);
+				if (mysac->res == NULL) {
+					mysac->errorcode = MYERR_NO_RES;
+					return mysac->errorcode;
+				}
+			}
+
+			/* update resource size */
+			while ((unsigned int)mysac->read_len < mysac->packet_length)
+				if (mysac_extend_res(mysac) != 0)
+					return MYSAC_RET_ERROR;
+
+			/* copy data */
+			memcpy(mysac->res->buffer, mysac->read, mysac->packet_length);
+			mysac->read = mysac->res->buffer;
+			mysac->read_len = mysac->res->buffer_len;
+			mysac->len = mysac->packet_length;
+		}
+
+		else {
+			err = mysac_decode_respbloc(mysac, mysac->expect);
+
+			/* want read */
+			if (err == MYERR_WANT_READ)
+				return MYERR_WANT_READ;
+
+			/* error */
+			if (err == MYSAC_RET_ERROR)
+				return mysac->errorcode;
+
+		}
 
 		/* ok ( for insert or no return data command ) */
 		if (mysac->expect == MYSAC_EXPECT_OK) {
@@ -403,6 +456,11 @@ int mysac_send_query(MYSAC *mysac) {
 		else if (err == MYSAC_RET_EOF) {
 			list_del(&mysac->res->cr->link);
 			mysac->res->cr = NULL;
+
+			/* check for multiquery flag. If is set, jump to start */
+			if (mysac->status & RESPONSE_MULTI_RESULTS)
+				goto case_MYSAC_RECV_QUERY_COLNUM;
+
 			return 0;
 		}
 
