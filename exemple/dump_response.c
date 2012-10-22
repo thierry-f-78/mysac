@@ -9,6 +9,12 @@ void dump_response(MYSAC_RES *r)
 	char buf[1024];
 	struct tm tm;
 
+	if (mysac_fetch_row(r) == NULL) {
+		printf("<empty result set>\n");
+		return;
+	}
+	mysac_first_row(r);
+
 	/* print headers */
 	printf("|");
 	for (i=0; i<r->nb_cols; i++)
