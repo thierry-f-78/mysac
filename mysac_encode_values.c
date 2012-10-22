@@ -275,8 +275,9 @@ int mysac_encode_value(MYSAC_BIND *val, char *out, int len) {
 	case MYSQL_TYPE_ENUM:
 	case MYSQL_TYPE_SET:
 	case MYSQL_TYPE_GEOMETRY:
+	default:
 		/* TODO: a faire */
-		break;
+		return -1;
 	}
 
 	return l;
