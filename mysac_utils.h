@@ -167,7 +167,8 @@ static inline int my_lcb(char *m, unsigned long *r,  char *nul, int len) {
 	unsigned long long val;
 	int retcode;
 	retcode = my_lcb_ll(m, &val, nul, len);
-	*r = val;
+	if (retcode >= 0)
+		*r = val;
 	return retcode;
 }
 
