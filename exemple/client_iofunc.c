@@ -27,7 +27,7 @@ int run_io(MYSAC *my) {
 	fd_set fds;
 	int ret_code;
 	int fd;
-	const char *func;
+	const char *func = NULL;
 
 	while (1) {
 		ret_code = mysac_io(my);
@@ -79,10 +79,10 @@ int main(int argc, char *argv[]) {
 	struct timeval start, stop, diff;
 	MYSAC my;
 	MYSAC_RES *r;
-	const char *host;
-	const char *login;
-	const char *pass;
-	const char *db;
+	const char *host = NULL;
+	const char *login = NULL;
+	const char *pass = NULL;
+	const char *db = NULL;
 
 	/* check */
 	if (argc != 10)

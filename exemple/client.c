@@ -46,10 +46,10 @@ int main(int argc, char *argv[]) {
 	struct timeval start, stop, diff;
 	MYSAC my;
 	MYSAC_RES *r;
-	const char *host;
-	const char *login;
-	const char *pass;
-	const char *db;
+	const char *host = NULL;
+	const char *login = NULL;
+	const char *pass = NULL;
+	const char *db = NULL;
 
 	/* check */
 	if (argc != 10)
