@@ -112,7 +112,7 @@ int mysac_send_query(MYSAC *mysac) {
 	int errcode;
 	int i;
 	int len;
-	int nb_cols;
+	unsigned int nb_cols;
 	MYSAC_RES *previous_res;
 
 	switch (mysac->qst) {
@@ -241,7 +241,7 @@ int mysac_send_query(MYSAC *mysac) {
 		}
 
 		/* get nb col TODO: pas sur que ce soit un byte */
-		nb_cols = mysac->read[0];
+		nb_cols = (unsigned char)mysac->read[0];
 		mysac->read_id = 0;
 		mysac->qst = MYSAC_RECV_QUERY_COLDESC1;
 
