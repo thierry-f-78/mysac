@@ -88,8 +88,7 @@ int mysac_extend_res(MYSAC *m)
 	/* if the pointer of the dat bloc changed, update links */
 
 	/* compute offset between old and new memory bloc */
-	offset = (long long int)(*(unsigned long int *)&res) -
-	         (long long int)(*(unsigned long int *)&m->res);
+	offset = (unsigned long int)res - (unsigned long int)m->res;
 
 	/* update pointers */
 	res->buffer = (char *)((char *)res->buffer + offset);
