@@ -34,7 +34,7 @@ int mysac_set_query_params(MYSAC *mysac, MYSAC_RES *res, int len) {
 	mysac->buf[4] = COM_QUERY;
 
 	/* request type */
-	mysac->expect = check_action(&mysac->buf[5], len);
+	mysac->expect = check_action(&mysac->buf[5], len, mysac);
 
 	/* unset statement result */
 	mysac->stmt_id = (void *)0;
@@ -136,9 +136,6 @@ int mysac_send_query(MYSAC *mysac) {
 		/* prepare first resource */
 		mysac->read = mysac->res->buffer;
 		mysac->read_len = mysac->res->buffer_len;
-
-		/* reset protocol response flags */
-		mysac->status = 0;
 
 	/**********************************************************
 	*

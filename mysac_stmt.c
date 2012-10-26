@@ -39,7 +39,7 @@ int mysac_b_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
 	memcpy(&mysac->buf[5], request, len);
 
 	/* request type */
-	mysac->expect = check_action(&mysac->buf[5], len);
+	mysac->expect = check_action(&mysac->buf[5], len, mysac);
 
 	/* l */
 	to_my_3(len + 1, &mysac->buf[0]);
@@ -75,7 +75,7 @@ int mysac_v_set_stmt_prepare(MYSAC *mysac, unsigned int *stmt_id,
 		return -1;
 
 	/* request type */
-	mysac->expect = check_action(&mysac->buf[5], len);
+	mysac->expect = check_action(&mysac->buf[5], len, mysac);
 
 	/* len */
 	to_my_3(len + 1, &mysac->buf[0]);

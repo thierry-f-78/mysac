@@ -19,8 +19,9 @@
 #include <ctype.h>
 
 #include "mysac.h"
+#include "mysac_decode_respbloc.h"
 
-enum my_expected_response_t check_action(const char *request, int len)
+enum my_expected_response_t check_action(const char *request, int len, MYSAC *mysac)
 {
 	const char *parse;
 
@@ -42,8 +43,10 @@ enum my_expected_response_t check_action(const char *request, int len)
 	if ( (len > 6) && ( strncasecmp(parse, "SELECT", 5) == 0) )
 		return MYSAC_EXPECT_DATA;
 
-	else if ( (len > 5) && ( strncasecmp(parse, "CALL", 4) == 0) )
+	else if ( (len > 5) && ( strncasecmp(parse, "CALL", 4) == 0) ) {
+		mysac->status = RESPONSE_MULTI_RESULTS;
 		return MYSAC_EXPECT_DATA;
+	}
 
 	return MYSAC_EXPECT_OK;
 }
