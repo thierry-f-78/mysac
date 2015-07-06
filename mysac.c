@@ -1677,8 +1677,10 @@ int mysac_send_query(MYSAC *mysac) {
 }
 
 void mysac_close(MYSAC *mysac) {
-	if (mysac->free_it == 1)
+	if (mysac->free_it == 1) {
+		free(mysac->buf);
 		free(mysac);
+	}
 }
 
 int mysac_get_fd(MYSAC *mysac) {
