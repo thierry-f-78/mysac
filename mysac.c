@@ -1677,6 +1677,7 @@ int mysac_send_query(MYSAC *mysac) {
 }
 
 void mysac_close(MYSAC *mysac) {
+	close(mysac->fd);
 	if (mysac->free_it == 1) {
 		free(mysac->buf);
 		free(mysac);
